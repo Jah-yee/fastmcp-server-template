@@ -44,15 +44,39 @@ fastmcp's `"fastmcp"` default.
 """
 
 
+def _preset_contract_env(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Set every variable the project's ``config_contract_env`` returns.
+
+    The fixture in the project's ``tests/conftest.py`` supplies values for
+    the variables its ``from_env`` reads with ``env(..., required=True)``.
+    Resolved via ``getfixturevalue`` so a ``conftest.py`` that predates the
+    fixture keeps passing with nothing preset.  Repeated verbatim in every
+    template-owned test that builds from the environment rather than
+    imported: a sibling import only resolves when ``tests/`` is not a package.
+    """
+    try:
+        env = request.getfixturevalue("config_contract_env")
+    except pytest.FixtureLookupError:
+        return
+    for key, value in dict(env).items():
+        monkeypatch.setenv(key, value)
+
+
 @pytest.fixture(autouse=True)
-def _neutral_docket_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def _neutral_docket_env(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Clear the native escape-hatch vars.
 
     An operator value in the ambient environment outranks parts of the
     derivation and would make the assertions below depend on the machine.
     Nothing process-global needs restoring any more: the extension is
     per-server state on the `FastMCP` instance each test builds and drops.
+    The project's `config_contract_env` is applied first.
     """
+    _preset_contract_env(request, monkeypatch)
     monkeypatch.delenv("FASTMCP_DOCKET_URL", raising=False)
     monkeypatch.delenv("FASTMCP_DOCKET_NAME", raising=False)
 

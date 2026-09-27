@@ -294,6 +294,46 @@ Steps: [upgrading/v9.3.md](upgrading/v9.3.md).
 
 Steps: [upgrading/v10.0.md](upgrading/v10.0.md).
 
-## Unreleased
+## Unreleased - Required config variables and `ConfigurationError` validation
 
-_Nothing yet._
+### Declare must-be-set variables with `required=True`
+
+fastmcp-pvl-core 10.1 adds `required=True` to `env`, `env_int` and
+`env_float`. An unset or blank variable raises `ConfigurationError`, which
+`serve` prints as one `ERROR: configuration error: …` line, and the generated
+configuration reference (`docs/configuration.md`) marks the variable
+required. `.env.example` and the config wizard do not flag required variables
+yet.
+
+If your server refuses to start without a variable, however it does that
+today (a check in `from_env`, in `__post_init__`, or where a tool registers):
+
+1. Read it in `CONFIG-FROM-ENV` as
+   `name=env(_ENV_PREFIX, "NAME", required=True),` and give the field a
+   placeholder default (`""`) in `CONFIG-FIELDS`. The placeholder only
+   satisfies dataclass field ordering; the generated docs do not show it.
+   `config.py` carries a commented `api_token` example of both halves.
+2. Delete the old check, or make it raise `ConfigurationError`.
+3. Return the variable, with a value a test can build the server with, from
+   `config_contract_env` in `tests/conftest.py`. The new template-owned test
+   `test_every_required_var_is_supplied_by_config_contract_env` fails,
+   naming the variable, until you do. Every template-owned test that builds
+   the server from the environment now applies that fixture, so an autouse
+   fixture you added only to satisfy those tests can go. `tests/test_smoke.py` and `tests/test_cli.py`
+   are yours, so check whether they need the variable too.
+4. Run `python scripts/gen_config_surface.py` and commit the regenerated
+   artifacts.
+
+### Raise `ConfigurationError`, not `ValueError`, in `CONFIG-VALIDATE`
+
+`serve` prints its one-line configuration error only for
+`ConfigurationError`; a `ValueError` from `__post_init__` escapes as a full
+Rich traceback. The template's advice and examples used to say `ValueError`.
+`config.py` now imports `ConfigurationError`, and
+`test_validate_block_raises_configuration_error_not_value_error` in
+`tests/test_config_contract.py` fails while an uncommented line in your
+`CONFIG-VALIDATE` block starts with `raise ValueError`. Change each such
+`raise ValueError(` to `raise ConfigurationError(`; no import is needed. If
+you had already added `ConfigurationError` to the `fastmcp_pvl_core` import in
+`config.py`, remove your copy: the template's own import now provides it, and
+keeping both fails ruff (`F811`).
