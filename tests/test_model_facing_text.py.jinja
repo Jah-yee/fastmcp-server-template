@@ -15,8 +15,9 @@ write instead.
 Every test takes the module's own ``server`` fixture: it scrubs the
 ``{{ env_prefix }}_*`` environment and builds the server synchronously, per
 test, so the asserted text is the wire text of a default deployment and not
-of whatever the shell carries, and the file does not depend on a fixture
-from the project-owned ``conftest.py``.
+of whatever the shell carries.  The one thing it takes from the
+project-owned ``conftest.py`` is ``config_contract_env``, when defined: the
+variables a server cannot be built without.
 """
 
 from __future__ import annotations
@@ -53,8 +54,31 @@ _SECTION_RE = re.compile(
 _STRING_SCHEMA_NOTE = 'following JSON schema: {"type":"string"}'
 
 
+def _preset_contract_env(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Apply the domain's ``config_contract_env`` fixture after the scrub.
+
+    A domain that cannot build its server without a variable (its
+    ``from_env`` or its registrars refuse an unset one) returns that variable
+    from ``config_contract_env`` in ``tests/conftest.py``, the seam
+    ``test_config_contract.py`` already honours.  Resolved via
+    ``getfixturevalue`` so a conftest without the fixture keeps passing with
+    nothing preset.
+    """
+    try:
+        env = request.getfixturevalue("config_contract_env")
+    except pytest.FixtureLookupError:
+        return
+    for key, value in dict(env).items():
+        monkeypatch.setenv(key, value)
+
+
 @pytest.fixture
-def server(monkeypatch: pytest.MonkeyPatch) -> FastMCP:
+def server(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> FastMCP:
     """A default deployment's server, built before any event loop starts.
 
     ``make_server`` finalises the instructions synchronously and refuses to
@@ -64,6 +88,7 @@ def server(monkeypatch: pytest.MonkeyPatch) -> FastMCP:
     for key in list(os.environ):
         if key.startswith("{{ env_prefix }}_"):
             monkeypatch.delenv(key, raising=False)
+    _preset_contract_env(request, monkeypatch)
     return make_server()
 
 
