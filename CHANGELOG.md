@@ -1,5 +1,10 @@
 # Changelog
 
+## v10.3.0 (2026-09-27)
+
+- #693 feat(config): required config variables and ConfigurationError validation
+
+
 ## v10.2.0 (2026-09-26)
 
 - #689 feat: non-strict required checks and integration-branch support
