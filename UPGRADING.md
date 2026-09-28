@@ -298,6 +298,38 @@ Steps: [upgrading/v10.0.md](upgrading/v10.0.md).
 
 Steps: [upgrading/v10.3.md](upgrading/v10.3.md).
 
-## Unreleased
+## Unreleased - SonarQube Cloud takes over coverage from Codecov
 
-_Nothing yet._
+CI now sends its coverage report to SonarQube Cloud through a CI-based scan
+(the new `sonar` job in `ci.yml`, configured by `sonar-project.properties`),
+and Codecov is gone: no upload step, no `codecov.yml`, no `CODECOV_TOKEN`.
+The patch-coverage status CI computes itself (diff-cover, 80%) is renamed
+from `codecov/patch` to `coverage/patch`.
+
+Do these in order. Until step 3, the `sonar` job skips its scan with a
+notice and passes, so the update itself stays green.
+
+1. **If `extra_required_checks` lists `codecov/patch`**, the update pull
+   request's CI posts `coverage/patch` instead, and the pull request waits
+   on a status that never comes. Merge it with the admin bypass, or edit
+   the ruleset's required checks by hand first. After it merges, re-answer
+   with `coverage/patch` in its place (list every other check you require
+   too), then re-run `bootstrap.yml` so the rulesets pick it up:
+
+   ```bash
+   copier update --defaults --data 'extra_required_checks=["coverage/patch"]'
+   ```
+2. **Turn off Automatic Analysis** in SonarQube Cloud: the project's
+   **Administration → Analysis Method**. SonarQube Cloud refuses a CI scan
+   while it is on, so the next step would otherwise turn CI red.
+3. **Add the `SONAR_TOKEN` secret.** The same Analysis Method page, with
+   GitHub Actions chosen, shows the token: `gh secret set SONAR_TOKEN`.
+4. **Check the first scan on `main`**: the project's coverage is no longer
+   empty, and its issues still include findings in `.github/workflows/`.
+5. **Remove Codecov**: `gh secret delete CODECOV_TOKEN`, and uninstall the
+   Codecov GitHub App for the repository if nothing else uses it. If
+   `codecov.yml` is still in the tree after the update, delete it.
+6. **Project analysis settings go in `sonar-project.properties`'s
+   `PROJECT-SONAR` block.** A key repeated there replaces the template's, so
+   extend `sonar.exclusions` or `sonar.coverage.exclusions` by restating
+   the template's value with your entries added.

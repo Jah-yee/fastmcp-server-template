@@ -59,3 +59,11 @@ def review_on_render(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return _render(
         tmp_path_factory, "review-on-render", "enable_automatic_claude_review=true"
     )
+
+
+@pytest.fixture(scope="session")
+def apps_off_render(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The smoke answers without the MCP Apps scaffold."""
+    return _render(
+        tmp_path_factory, "apps-off-render", "include_mcp_apps_scaffold=false"
+    )

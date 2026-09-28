@@ -1,6 +1,6 @@
-"""Guard the `codecov/patch` description's coverage parse in `ci.yml` (#561).
+"""Guard the `coverage/patch` description's coverage parse in `ci.yml` (#561).
 
-The rendered `ci.yml` posts a `codecov/patch` commit status whose
+The rendered `ci.yml` posts a `coverage/patch` commit status whose
 description quotes the patch coverage diff-cover computed.  diff-cover's
 summary carries two numbers, and the step used to read the wrong one::
 
