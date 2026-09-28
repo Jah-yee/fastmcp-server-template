@@ -13,22 +13,28 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14"]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
           version: "0.12"
 
       - name: Set up Python ${{ matrix.python }}
         run: uv python install ${{ matrix.python }}
 
+      - name: Install template tooling (locked)
+        # copier, ruff, pytest and the rest come from the repository's own
+        # uv.lock (pyproject.toml at the root), so no step resolves whatever
+        # is newest on the day it runs (#694).
+        run: uv sync --locked --no-build
+
       - name: Render smoke project with copier
         # --vcs-ref=HEAD is not optional here; every render step in this file
         # carries it. See the `clean-tree opt-out render` step below for why,
         # and why removing it from one step alone breaks the job locally.
         run: |
-          uv run --no-project --with copier \
+          uv run --no-sync --no-build \
             copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file tests/fixtures/smoke-answers.yml \
             . /tmp/smoke
@@ -44,7 +50,7 @@ jobs:
         # in a tag-bearing clone, and this diff then reports an idempotence
         # failure that does not exist.
         run: |
-          uv run --no-project --with copier \
+          uv run --no-sync --no-build \
             copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file tests/fixtures/smoke-answers.yml \
             . /tmp/smoke2
@@ -66,7 +72,7 @@ jobs:
         # mccabe/pylint thresholds AND the tests/** S-ignore).
         run: |
           rm -rf /tmp/smoke-gate-off
-          uv run --no-project --with copier \
+          uv run --no-sync --no-build \
             copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file tests/fixtures/smoke-answers.yml \
             --data enable_structural_gate=false \
@@ -111,7 +117,7 @@ jobs:
         # sees.
         run: |
           rm -rf /tmp/smoke-authz-off
-          uv run --no-project --with copier \
+          uv run --no-sync --no-build \
             copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file tests/fixtures/smoke-answers.yml \
             --data enable_authorization=false \
@@ -120,7 +126,7 @@ jobs:
       - name: Render automatic-review variant
         run: |
           rm -rf /tmp/smoke-claude-review-on
-          uv run --no-project --with copier copier copy --trust --defaults \
+          uv run --no-sync --no-build copier copy --trust --defaults \
             --vcs-ref=HEAD --data-file tests/fixtures/smoke-answers.yml \
             --data enable_automatic_claude_review=true \
             . /tmp/smoke-claude-review-on
@@ -166,7 +172,7 @@ jobs:
         # below use it directly.
         run: |
           rm -rf /tmp/smoke-cleantree-off
-          uv run --no-project --with copier \
+          uv run --no-sync --no-build \
             copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file tests/fixtures/smoke-answers.yml \
             --data structural_gate_assert_clean_tree=false \
@@ -183,7 +189,7 @@ jobs:
         # the hygiene step, for the same reason as the variants before it.
         run: |
           rm -rf /tmp/smoke-long-names
-          uv run --no-project --with copier \
+          uv run --no-sync --no-build \
             copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file tests/fixtures/smoke-answers.yml \
             --data project_name=a-deliberately-long-name-for-mcp \
@@ -270,28 +276,28 @@ jobs:
           # unused import left by the trim and any if/endif whitespace regression).
           for d in /tmp/smoke /tmp/smoke-cleantree-off; do
             ( cd "$d" \
-              && uv run --no-project --with ruff ruff check --config pyproject.toml tests/test_structural_gate.py \
-              && uv run --no-project --with ruff ruff format --check --config pyproject.toml tests/test_structural_gate.py ) \
+              && uv run --no-sync --no-build --project "$GITHUB_WORKSPACE" ruff check --config pyproject.toml tests/test_structural_gate.py \
+              && uv run --no-sync --no-build --project "$GITHUB_WORKSPACE" ruff format --check --config pyproject.toml tests/test_structural_gate.py ) \
               || { echo "::error::rendered structural test ($d) is not lint/format-clean"; exit 1; }
           done
 
       - name: Install rendered project
         working-directory: /tmp/smoke
-        run: uv sync --all-extras --all-groups
+        run: uv sync --all-extras --all-groups  # NOSONAR(githubactions:S8541,S8544): a fresh render has no uv.lock, and this installs the project itself (#694)
 
       - name: Assert MCP Apps SPA was vendored
         working-directory: /tmp/smoke
         run: |
           test -f src/smoke_mcp/static/app.html
-          uv run python scripts/vendor_spa.py --check
+          uv run --no-sync --no-build python scripts/vendor_spa.py --check
 
       - name: ruff check
         working-directory: /tmp/smoke
-        run: uv run ruff check .
+        run: uv run --no-sync --no-build ruff check .
 
       - name: ruff format --check
         working-directory: /tmp/smoke
-        run: uv run ruff format --check .
+        run: uv run --no-sync --no-build ruff format --check .
 
       - name: ruff over the long-identifiers render
         # The smoke project's own locked ruff, so this cannot drift from the
@@ -304,11 +310,11 @@ jobs:
 
       - name: mypy
         working-directory: /tmp/smoke
-        run: uv run mypy src/ tests/
+        run: uv run --no-sync --no-build mypy src/ tests/
 
       - name: pytest
         working-directory: /tmp/smoke
-        run: uv run pytest -x -q
+        run: uv run --no-sync --no-build pytest -x -q
 
       - name: required-var variant (env(required=True) + config_contract_env)
         # A copy of the smoke project with config.py's shipped `api_token`
@@ -497,7 +503,7 @@ jobs:
           # re-generation. Mirrors the `--check` step the rendered project's
           # OWN ci.yml.jinja runs on every downstream commit; nothing in
           # template-ci exercised it before this step.
-          uv run python scripts/gen_config_surface.py --check \
+          uv run --no-sync --no-build python scripts/gen_config_surface.py --check \
             || { echo "::error::gen_config_surface.py --check reports the rendered config artifacts are stale — generation is not idempotent"; exit 1; }
 
       - name: server.json generated env-var arrays (packaging, identity)
@@ -574,7 +580,7 @@ jobs:
         working-directory: /tmp/smoke
         run: |
           set -euo pipefail
-          uv run python3 - "$GITHUB_WORKSPACE/schemas/server.schema.json" <<'PY' || { echo "::error::server.json does not validate against schemas/server.schema.json"; exit 1; }
+          uv run --no-sync --no-build python3 - "$GITHUB_WORKSPACE/schemas/server.schema.json" <<'PY' || { echo "::error::server.json does not validate against schemas/server.schema.json"; exit 1; }
           import json
           import sys
 
@@ -871,7 +877,7 @@ jobs:
             .github/workflows/release.yml | head -1 | cut -d@ -f2 || true)
           [ -n "$SHA" ] \
             || { echo "::error::no pinned gh-action-pypi-publish SHA in rendered release.yml"; exit 1; }
-          curl -fsSL --retry 3 \
+          curl -fsSL --proto '=https' --tlsv1.2 --retry 3 \
             "https://raw.githubusercontent.com/pypa/gh-action-pypi-publish/${SHA}/requirements/runtime.txt" \
             -o /tmp/publisher-runtime.txt
           TWINE=$(grep -E '^twine==' /tmp/publisher-runtime.txt || true)
@@ -1181,7 +1187,7 @@ jobs:
         # asserted equal to the rendered .vale.ini's `Packages =` by the
         # lockstep step above.
         if: matrix.python == '3.11'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6
         with:
           path: |
             /tmp/smoke/.vale/styles/Google
@@ -1268,9 +1274,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/valebin"
           TARBALL="vale_${VER}_Linux_64-bit.tar.gz"
           BASE="https://github.com/vale-cli/vale/releases/download/v${VER}"
-          curl -sSfL -o "$RUNNER_TEMP/$TARBALL" "$BASE/$TARBALL" \
+          curl -sSfL --proto '=https' --tlsv1.2 -o "$RUNNER_TEMP/$TARBALL" "$BASE/$TARBALL" \
             || { echo "::error::could not download $BASE/$TARBALL — vale $VER release asset missing or unreachable. The version comes from the rendered ci.yml, so check that pin first."; exit 1; }
-          curl -sSfL -o "$RUNNER_TEMP/checksums.txt" "$BASE/vale_${VER}_checksums.txt" \
+          curl -sSfL --proto '=https' --tlsv1.2 -o "$RUNNER_TEMP/checksums.txt" "$BASE/vale_${VER}_checksums.txt" \
             || { echo "::error::could not download the vale $VER checksums file from $BASE"; exit 1; }
           ( cd "$RUNNER_TEMP" && grep " $TARBALL\$" checksums.txt | sha256sum -c - ) \
             || { echo "::error::vale $VER tarball failed checksum verification"; exit 1; }
@@ -1603,7 +1609,7 @@ jobs:
           # The detached docs must still build strictly: a dangling nav entry
           # or a link to a removed page is exactly what a fork's docs.yml
           # would fail on next.  The venv from the gate above is reused.
-          uv run mkdocs build --strict -q \
+          uv run --no-sync --no-build mkdocs build --strict -q \
             || { echo "::error::mkdocs build --strict fails on the detached tree"; exit 1; }
           # The releasing skill's own TEMPLATE-TRACKING pair (pair 2) has no
           # over-run guard from the AGENTS.md kept-section loop below, since
@@ -1730,37 +1736,48 @@ jobs:
     name: Downstream workflow gate (docs + packaging)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
           version: "0.12"
 
       - name: Set up Python 3.12
         run: uv python install 3.12
 
+      - name: Install template tooling (locked)
+        # copier, ruff, pytest and the rest come from the repository's own
+        # uv.lock (pyproject.toml at the root), so no step resolves whatever
+        # is newest on the day it runs (#694).
+        run: uv sync --locked --no-build
+
       - name: Render smoke project with copier
         run: |
-          uv run --no-project --with copier \
+          uv run --no-sync --no-build \
             copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file tests/fixtures/smoke-answers.yml \
             . /tmp/smoke
 
       - name: Install rendered project (with all extras and groups)
         working-directory: /tmp/smoke
-        run: uv sync --all-extras --all-groups
+        run: uv sync --all-extras --all-groups  # NOSONAR(githubactions:S8541,S8544): a fresh render has no uv.lock, and this installs the project itself (#694)
 
       - name: Install nfpm
         # Pin matches release.yml.jinja so we exercise the same version
         # downstream projects will use.  Bump both in lockstep.
         run: |
-          curl -sfL https://github.com/goreleaser/nfpm/releases/download/v2.41.1/nfpm_2.41.1_Linux_x86_64.tar.gz \
-            | sudo tar -xz -C /usr/local/bin nfpm
+          # Verified against the release's checksums.txt before sudo extracts
+          # it into /usr/local/bin (#694).
+          NFPM_SHA256=b3cf95aa6dabed836d09ad7f0c190a13c74c5b1304db60846f0f702ee407f430
+          curl -fsSL --proto '=https' --tlsv1.2 --retry 3 -o "$RUNNER_TEMP/nfpm.tar.gz" \
+            https://github.com/goreleaser/nfpm/releases/download/v2.41.1/nfpm_2.41.1_Linux_x86_64.tar.gz
+          echo "$NFPM_SHA256  $RUNNER_TEMP/nfpm.tar.gz" | sha256sum -c -
+          sudo tar -xz -C /usr/local/bin -f "$RUNNER_TEMP/nfpm.tar.gz" nfpm
 
       - name: mkdocs build --strict
         working-directory: /tmp/smoke
-        run: uv run mkdocs build --strict
+        run: uv run --no-sync --no-build mkdocs build --strict
 
       - name: nfpm package (deb)
         working-directory: /tmp/smoke
@@ -1885,7 +1902,7 @@ jobs:
     name: Copier-update keeps domain vars
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           # The check renders a released tag from a fresh clone of this
           # checkout, and copier describes HEAD against tags to order the
@@ -1894,12 +1911,18 @@ jobs:
           fetch-tags: true
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
           version: "0.12"
 
       - name: Set up Python 3.12
         run: uv python install 3.12
+
+      - name: Install template tooling (locked)
+        # copier, ruff, pytest and the rest come from the repository's own
+        # uv.lock (pyproject.toml at the root), so no step resolves whatever
+        # is newest on the day it runs (#694).
+        run: uv sync --locked --no-build
 
       - name: Run the copier-update regression check
         # Guards the update-time generation ordering: renders v3.0.2,
@@ -1921,28 +1944,29 @@ jobs:
     name: Template scripts and invariants
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
           version: "0.12"
 
       - name: Set up Python 3.12
         run: uv python install 3.12
 
+      - name: Install template tooling (locked)
+        # copier, ruff, pytest and the rest come from the repository's own
+        # uv.lock (pyproject.toml at the root), so no step resolves whatever
+        # is newest on the day it runs (#694).
+        run: uv sync --locked --no-build
+
       - name: Run script unit tests
-        # Install the core at exactly the constraint the template renders
-        # (pyproject.toml.jinja): the generator's fixtures assert core help
-        # text, and an unbounded install picked up 5.0.0 the day it shipped
-        # and turned main red (#509).  Reading the constraint out of the
-        # template keeps floor and cap in lockstep without a second copy.
-        run: |
-          # Quoted form only, so a rationale comment naming the package can never win.
-          CORE=$(grep -oE '"fastmcp-pvl-core>=[^"]*"' pyproject.toml.jinja | head -1 | tr -d '"')
-          [ -n "$CORE" ] || { echo "::error::no fastmcp-pvl-core constraint in pyproject.toml.jinja"; exit 1; }
-          echo "core constraint: $CORE"
-          uv run --with pytest --with pyyaml --with jsonschema --with jinja2 --with copier --with "$CORE" pytest scripts/tests/ -v
+        # The core comes from the locked tooling env at exactly the constraint
+        # the template renders (pyproject.toml.jinja): the generator's fixtures
+        # assert core help text, and an unbounded install picked up 5.0.0 the
+        # day it shipped and turned main red (#509).
+        # scripts/tests/test_tooling_env.py keeps the two pins equal.
+        run: uv run --no-sync --no-build pytest scripts/tests/ -v
 
       - name: UPGRADING.md Unreleased section
         run: |
@@ -1970,13 +1994,19 @@ jobs:
         # when the two drift. Catch regressions here before they surface in
         # downstream CI on the next copier-update.
         run: |
-          uv run --with ruff ruff check \
+          uv run --no-sync --no-build ruff check \
             scripts/copier_update_notes.py scripts/check_render_hygiene.py scripts/check_update_regression.py scripts/gen_config_surface.py scripts/check_pins.py scripts/check_references.py scripts/report_seeded_changes.py scripts/check_template_conformance.py scripts/promote_release_notes.py scripts/promote_upgrading.py scripts/package_milestones.py scripts/migrate_agent_instructions.py scripts/check_pr_title.py scripts/repo_about.py scripts/tests/
+
+      - name: Type-check scripts (mypy)
+        # The pre-commit hook's mypy, from the same locked tooling env, so
+        # scripts/ is type-checked in CI too and not only on a maintainer's
+        # machine (#694).
+        run: uv run --no-sync --no-build mypy scripts/
 
       - name: Format check scripts (ruff format matching downstream)
         # Line length and target come from the root ruff.toml (see above).
         run: |
-          uv run --with ruff ruff format --check \
+          uv run --no-sync --no-build ruff format --check \
             scripts/copier_update_notes.py scripts/check_render_hygiene.py scripts/check_update_regression.py scripts/gen_config_surface.py scripts/check_pins.py scripts/check_references.py scripts/report_seeded_changes.py scripts/check_template_conformance.py scripts/promote_release_notes.py scripts/promote_upgrading.py scripts/package_milestones.py scripts/migrate_agent_instructions.py scripts/check_pr_title.py scripts/repo_about.py scripts/tests/
 
       - name: Structural gate on shipped scripts (matches downstream diff-gate)
@@ -2010,7 +2040,7 @@ jobs:
         # `--select` on the command line replaces ruff.toml's `select`, so
         # the base lint set does not leak into this stricter pass.
         run: |
-          uv run --with ruff ruff check \
+          uv run --no-sync --no-build ruff check \
             --select C901,PLR0911,PLR0912,PLR0913,PLR0915,S \
             --per-file-ignores "scripts/gen_config_surface.py:S606,scripts/promote_release_notes.py:S603,scripts/promote_release_notes.py:S607,scripts/check_pins.py:S310,scripts/report_seeded_changes.py:S603,scripts/report_seeded_changes.py:S606,scripts/report_seeded_changes.py:S607,scripts/check_template_conformance.py:S603,scripts/check_template_conformance.py:S606,scripts/check_template_conformance.py:S607,scripts/package_milestones.py:S603,scripts/package_milestones.py:S607,scripts/migrate_agent_instructions.py:S603,scripts/migrate_agent_instructions.py:S607" \
             --config "lint.mccabe.max-complexity=10" \
@@ -2036,7 +2066,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
 
       - name: Check pull-request title
         env:
