@@ -306,18 +306,20 @@ and Codecov is gone: no upload step, no `codecov.yml`, no `CODECOV_TOKEN`.
 The patch-coverage status CI computes itself (diff-cover, 80%) is renamed
 from `codecov/patch` to `coverage/patch`.
 
-Do these in order. Until step 3, the `sonar` job skips its scan with a
-notice and passes, so the update itself stays green.
+The `sonar` job is part of `CI Success`, so from this update on a failed
+scan blocks merging — a SonarQube Cloud outage, an expired `SONAR_TOKEN`, or
+Automatic Analysis left on. Re-run the job once the cause is gone. Without a
+`SONAR_TOKEN` the job skips the scan with a notice and passes.
+
+**Before merging the update pull request:**
 
 1. **Delete every ruleset the template does not ship.** The template's
    four (`protect-main`, `protect-release-branches`,
    `protect-release-tags`, `protect-integration-branches`, applied by
    `bootstrap.yml`) are the repository's whole protection; anything else is
-   hand-maintained, and often still requires `codecov/patch`. The update
-   pull request's CI posts `coverage/patch` instead, so a ruleset still
-   requiring the old context leaves that pull request waiting on a status
-   that never comes. List the others, check each is not protecting
-   something the template's four miss, and delete it:
+   hand-maintained, and often still requires `codecov/patch`, a status the
+   update's CI no longer posts. List the others, check each is not
+   protecting something the template's four miss, and delete it:
 
    ```bash
    gh api repos/{owner}/{repo}/rulesets --jq '.[]
@@ -327,25 +329,38 @@ notice and passes, so the update itself stays green.
    gh api -X DELETE repos/{owner}/{repo}/rulesets/<id>
    ```
 
-   **If `extra_required_checks` lists `codecov/patch`**, the template's own
-   rulesets require it too: merge the update pull request with the admin
-   bypass, then re-answer with `coverage/patch` in its place (list every
-   other check you require too) and re-run `bootstrap.yml`:
+2. **If `extra_required_checks` lists `codecov/patch`**, re-answer it on
+   the update pull request's branch, with `coverage/patch` in its place
+   (list every other check you require too), and commit the result there:
 
    ```bash
    copier update --defaults --data 'extra_required_checks=["coverage/patch"]'
    ```
-2. **Turn off Automatic Analysis** in SonarQube Cloud: the project's
+
+   The live rulesets still require `codecov/patch` until this merges, so
+   merge the pull request with the admin bypass. `bootstrap.yml` then runs
+   on its own, because the push touches `.github/rulesets/`, and applies
+   `coverage/patch`.
+
+3. **Turn off Automatic Analysis** in SonarQube Cloud: the project's
    **Administration → Analysis Method**. SonarQube Cloud refuses a CI scan
-   while it is on, so the next step would otherwise turn CI red.
-3. **Add the `SONAR_TOKEN` secret.** The same Analysis Method page, with
-   GitHub Actions chosen, shows the token: `gh secret set SONAR_TOKEN`.
-4. **Check the first scan on `main`**: the project's coverage is no longer
+   while it is on, and fails the `sonar` job.
+
+4. **Make sure the `SONAR_TOKEN` secret exists.** The same Analysis Method
+   page, with GitHub Actions chosen, shows the token:
+   `gh secret set SONAR_TOKEN`.
+
+5. **Re-run the update pull request's `CI` workflow** and check its `SonarQube`
+   job ran the scan rather than skipping it.
+
+**After it merges:**
+
+6. **Check the first scan on `main`**: the project's coverage is no longer
    empty, and its issues still include findings in `.github/workflows/`.
-5. **Remove Codecov**: `gh secret delete CODECOV_TOKEN`, and uninstall the
+7. **Remove Codecov**: `gh secret delete CODECOV_TOKEN`, and uninstall the
    Codecov GitHub App for the repository if nothing else uses it. If
-   `codecov.yml` is still in the tree after the update, delete it.
-6. **Project analysis settings go in `sonar-project.properties`'s
+   `codecov.yml` is still in the tree, delete it.
+8. **Project analysis settings go in `sonar-project.properties`'s
    `PROJECT-SONAR` block.** A key repeated there replaces the template's, so
    extend `sonar.exclusions` or `sonar.coverage.exclusions` by restating
    the template's value with your entries added.

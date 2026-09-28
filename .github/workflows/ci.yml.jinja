@@ -221,6 +221,8 @@ jobs:
     # not set the secret yet) the scan is skipped with a notice and the job
     # passes.  With it, SonarQube Cloud refuses the scan while the project's
     # Automatic Analysis is still on: turn that off before adding the secret.
+    # In CI Success on purpose: a failed scan (an outage, an expired token)
+    # blocks merging until the job is re-run, rather than passing unseen.
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
