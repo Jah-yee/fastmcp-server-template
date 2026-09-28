@@ -309,33 +309,32 @@ from `codecov/patch` to `coverage/patch`.
 Do these in order. Until step 3, the `sonar` job skips its scan with a
 notice and passes, so the update itself stays green.
 
-1. **Find every ruleset that requires `codecov/patch`**, not only the
-   template's. A hand-made ruleset (often named `Default`) is invisible to
-   `bootstrap.yml` and survives any re-answer:
+1. **Delete every ruleset the template does not ship.** The template's
+   four (`protect-main`, `protect-release-branches`,
+   `protect-release-tags`, `protect-integration-branches`, applied by
+   `bootstrap.yml`) are the repository's whole protection; anything else is
+   hand-maintained, and often still requires `codecov/patch`. The update
+   pull request's CI posts `coverage/patch` instead, so a ruleset still
+   requiring the old context leaves that pull request waiting on a status
+   that never comes. List the others, check each is not protecting
+   something the template's four miss, and delete it:
 
    ```bash
-   for id in $(gh api repos/{owner}/{repo}/rulesets --jq '.[].id'); do
-     gh api repos/{owner}/{repo}/rulesets/$id --jq '"\(.name): " + ([.rules[]
-       | select(.type=="required_status_checks")
-       | .parameters.required_status_checks[].context] | join(", "))'
-   done
+   gh api repos/{owner}/{repo}/rulesets --jq '.[]
+     | select(.name | IN("protect-main", "protect-release-branches",
+         "protect-release-tags", "protect-integration-branches") | not)
+     | "\(.id) \(.name)"'
+   gh api -X DELETE repos/{owner}/{repo}/rulesets/<id>
    ```
 
-   The update pull request's CI posts `coverage/patch` instead, so while any
-   of them still requires `codecov/patch` that pull request waits on a
-   status that never comes. Before merging it:
+   **If `extra_required_checks` lists `codecov/patch`**, the template's own
+   rulesets require it too: merge the update pull request with the admin
+   bypass, then re-answer with `coverage/patch` in its place (list every
+   other check you require too) and re-run `bootstrap.yml`:
 
-   - **A hand-made ruleset:** replace `codecov/patch` with
-     `coverage/patch` in it, or delete it if the template's `protect-main`
-     already covers what it enforces.
-   - **`extra_required_checks` lists `codecov/patch`:** merge with the
-     admin bypass. Afterwards, re-answer with `coverage/patch` in its place
-     (list every other check you require too), then re-run
-     `bootstrap.yml` so the template's rulesets pick it up:
-
-     ```bash
-     copier update --defaults --data 'extra_required_checks=["coverage/patch"]'
-     ```
+   ```bash
+   copier update --defaults --data 'extra_required_checks=["coverage/patch"]'
+   ```
 2. **Turn off Automatic Analysis** in SonarQube Cloud: the project's
    **Administration → Analysis Method**. SonarQube Cloud refuses a CI scan
    while it is on, so the next step would otherwise turn CI red.
