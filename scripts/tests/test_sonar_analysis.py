@@ -65,6 +65,7 @@ def test_coverage_counts_only_the_package(smoke_render: Path) -> None:
         "tests/**",
         "scripts/**",
         "docs/**",
+        "examples/**",
         "packaging/**",
         ".github/**",
     } <= excluded
