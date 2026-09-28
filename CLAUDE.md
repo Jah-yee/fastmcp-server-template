@@ -62,6 +62,12 @@ create new projects.
   tool through `uv run --no-sync`; run tools locally with `uv run --locked`.
   Its pvl-core pin must equal `pyproject.toml.jinja`'s, which
   `scripts/tests/test_tooling_env.py` enforces — bump both, then `uv lock`.
+- `sonar-project.properties` — this repo's own SonarQube Cloud settings,
+  read by template-ci's `sonar` job, which scans with the script tests'
+  coverage (`[tool.coverage.run]` in `pyproject.toml`). The project's
+  Automatic Analysis is off, so that job is the template's only analysis.
+  Never rendered: generated projects get `sonar-project.properties.jinja`
+  (copier's `.jinja` precedence), with their own `sonar` job in `ci.yml`.
 - `ruff.toml` — lint configuration for this repo's own Python under
   `scripts/`, read by the pre-commit hooks and `template-ci`'s lint and
   format steps alike; excluded from renders (a generated project carries

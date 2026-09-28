@@ -65,7 +65,7 @@ def test_one_required_interpreter_collects_and_consumes_coverage(
         for step in job["steps"]
         if "coverage" in step.get("name", "").lower()
         or step.get("name") == "Fetch base branch for diff-cover"
-        or step.get("name") == "Post codecov/patch status"
+        or step.get("name") == "Post coverage/patch status"
     ]
     assert len(consumers) == 7
     assert all(step["if"].startswith(condition) for step in consumers)

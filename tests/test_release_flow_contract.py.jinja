@@ -2465,12 +2465,12 @@ def test_committed_pins_name_the_last_stable_or_the_prepared_version() -> None:
         (COVERAGE_STATUS_WORKFLOW, "coverage-status.yml (fork-PR fallback)"),
     ],
 )
-def test_every_codecov_patch_poster_posts_under_all_outcomes(
+def test_every_coverage_patch_poster_posts_under_all_outcomes(
     workflow: Path, label: str
 ) -> None:
-    """Both posters of ``codecov/patch`` report something, always.
+    """Both posters of ``coverage/patch`` report something, always.
 
-    `extra_required_checks` lets a project make ``codecov/patch`` a required
+    `extra_required_checks` lets a project make ``coverage/patch`` a required
     context.  A required check that never reports does not turn a pull request
     red — it leaves it waiting forever on a status that is not coming, and the
     only exits are an admin bypass or a ruleset edit.  So "post an ``error``"
@@ -2486,12 +2486,12 @@ def test_every_codecov_patch_poster_posts_under_all_outcomes(
     else couples them.
     """
     text = workflow.read_text(encoding="utf-8")
-    poster = text.index("name: Post codecov/patch status")
+    poster = text.index("name: Post coverage/patch status")
     # Look only at the posting step, not the whole workflow: `always()`
     # elsewhere in the file would satisfy a naive substring check.
     step = text[poster : poster + 2000]
     assert "always()" in step, (
-        f"{label}: the codecov/patch posting step must run under all outcomes"
+        f"{label}: the coverage/patch posting step must run under all outcomes"
     )
     # ...and it must carry a fallback state, or `always()` only guarantees the
     # step runs, not that it posts a usable status.
