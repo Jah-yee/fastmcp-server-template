@@ -1,5 +1,18 @@
 # Changelog
 
+## v11.0.0 (2026-09-28)
+
+- #703 test(scripts): measure the coverage the template's tests already give
+- #702 feat!: SonarQube Cloud CI analysis takes over coverage from Codecov
+- #701 docs(readme): replace the repowise badges with SonarCloud ratings
+- #700 fix(scripts): remove the four remaining SonarCloud taint flows without NOSONAR
+- #698 fix(scripts): sanitize CLI input in the shapes SonarCloud recognises
+- #697 chore(deps): update dependency renovatebot/github-action to v46.3.5
+- #696 chore(deps): update dependency anchore/sbom-action to v0.24.2
+- #695 fix(ci): harden rendered workflows, shipped scripts and template CI (SonarCloud)
+- #687 chore(deps): update dependency renovatebot/github-action to v46.3.4
+
+
 ## v10.3.0 (2026-09-27)
 
 - #693 feat(config): required config variables and ConfigurationError validation
