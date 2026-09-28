@@ -11,6 +11,7 @@ dependencies = [
     "copier",
     "ruff",
     "pytest",
+    "pytest-cov",
     "pyyaml",
     "jsonschema",
     "jinja2",
@@ -24,3 +25,15 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+# Coverage of the template's own Python, for the `sonar` job in template-ci.
+# Relative paths keep coverage.xml valid in the job that scans it.
+[tool.coverage.run]
+# Source directories, so a script the tests only run as a subprocess is still
+# listed (at 0%).  With relative_files the report's <source> entries are these
+# paths and each filename is relative to one; SonarQube Cloud resolves that
+# against the checkout, as fastmcp-pvl-core's scan does.
+source = ["scripts", ".github/actions/build-plugin-zip"]
+omit = ["scripts/tests/*"]
+branch = true
+relative_files = true

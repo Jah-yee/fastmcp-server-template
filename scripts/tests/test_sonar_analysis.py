@@ -9,12 +9,9 @@ downstream actually gets; Codecov is gone from it entirely.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import yaml
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def _properties(render: Path) -> dict[str, str]:
@@ -121,6 +118,9 @@ def test_coverage_report_is_uploaded_for_pushes_too(smoke_render: Path) -> None:
     )
     assert upload["if"] == "matrix.python-version == '3.14'"
     assert upload["with"]["name"] == "coverage-xml"
+    assert upload["with"]["if-no-files-found"] == "error"
+    # Relative paths: the report is read in another job's checkout.
+    assert "relative_files = true" in (smoke_render / "pyproject.toml").read_text()
 
 
 def test_sonar_token_never_reaches_the_test_job(smoke_render: Path) -> None:
@@ -140,3 +140,42 @@ def test_codecov_is_gone_from_the_render(smoke_render: Path) -> None:
         and "codecov" in p.read_text(errors="ignore").lower()
     ]
     assert not hits, hits
+
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+def test_template_repo_scans_itself() -> None:
+    """The template's own SonarQube Cloud project runs on this CI scan alone
+    (its Automatic Analysis is off), with the script tests' coverage."""
+    props = _properties(REPO)
+    assert props["sonar.projectKey"] == "pvliesdonk_fastmcp-server-template"
+    readme = (REPO / "README.md").read_text()
+    keys = set(re.findall(r"project_badges/measure\?project=([^&]+)", readme))
+    assert keys == {props["sonar.projectKey"]}
+    assert props["sonar.python.coverage.reportPaths"] == "coverage.xml"
+
+    ci = yaml.safe_load((REPO / ".github/workflows/template-ci.yml").read_text())
+    tests = ci["jobs"]["scripts-and-invariants"]["steps"]
+    run = next(s for s in tests if s.get("name") == "Run script unit tests")["run"]
+    assert "--cov" in run and "--cov-report=xml" in run
+    upload = next(s for s in tests if s.get("name") == "Upload coverage report")
+    assert upload["with"] == {
+        "name": "coverage-xml",
+        "path": "coverage.xml",
+        "if-no-files-found": "error",
+        "retention-days": 1,
+    }
+    sonar = ci["jobs"]["sonar"]
+    assert sonar["needs"] == "scripts-and-invariants"
+    scan = next(s for s in sonar["steps"] if s.get("name") == "SonarQube Scan")
+    assert re.fullmatch(r"SonarSource/sonarqube-scan-action@[0-9a-f]{40}", scan["uses"])
+    for step in sonar["steps"][1:]:
+        assert step["if"] == "steps.token.outputs.present == 'true'", step
+
+
+def test_template_repo_config_stays_out_of_renders(smoke_render: Path) -> None:
+    """copier gives sonar-project.properties.jinja precedence over the
+    template's own plain file of the same name."""
+    rendered = (smoke_render / "sonar-project.properties").read_text()
+    assert "fastmcp-server-template" not in rendered

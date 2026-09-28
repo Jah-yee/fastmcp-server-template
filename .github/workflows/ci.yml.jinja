@@ -112,6 +112,7 @@ jobs:
         with:
           name: coverage-xml
           path: coverage.xml
+          if-no-files-found: error
           retention-days: 1
 
       - name: Fetch base branch for diff-cover

@@ -359,6 +359,8 @@ markers = [
 [tool.coverage.run]
 source = ["src/{{ python_module }}"]
 branch = true
+# Relative paths keep coverage.xml valid in the ci.yml job that scans it.
+relative_files = true
 
 [tool.coverage.report]
 fail_under = 80
