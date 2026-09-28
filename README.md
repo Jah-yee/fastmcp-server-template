@@ -1,6 +1,6 @@
 # fastmcp-server-template
 
-[![repowise](https://api.repowise.dev/badge/wiki/pvliesdonk/fastmcp-server-template.svg)](https://repowise.dev/repo/pvliesdonk/fastmcp-server-template) [![Code health](https://api.repowise.dev/badge/health/pvliesdonk/fastmcp-server-template.svg)](https://repowise.dev/repo/pvliesdonk/fastmcp-server-template)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=pvliesdonk_fastmcp-server-template&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=pvliesdonk_fastmcp-server-template) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=pvliesdonk_fastmcp-server-template&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=pvliesdonk_fastmcp-server-template) [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=pvliesdonk_fastmcp-server-template&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=pvliesdonk_fastmcp-server-template)
 
 Copier template that scaffolds a production-ready FastMCP server on top of
 [`fastmcp-pvl-core`](https://pypi.org/project/fastmcp-pvl-core/): auth,
