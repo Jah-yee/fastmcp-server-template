@@ -309,16 +309,33 @@ from `codecov/patch` to `coverage/patch`.
 Do these in order. Until step 3, the `sonar` job skips its scan with a
 notice and passes, so the update itself stays green.
 
-1. **If `extra_required_checks` lists `codecov/patch`**, the update pull
-   request's CI posts `coverage/patch` instead, and the pull request waits
-   on a status that never comes. Merge it with the admin bypass, or edit
-   the ruleset's required checks by hand first. After it merges, re-answer
-   with `coverage/patch` in its place (list every other check you require
-   too), then re-run `bootstrap.yml` so the rulesets pick it up:
+1. **Find every ruleset that requires `codecov/patch`**, not only the
+   template's. A hand-made ruleset (often named `Default`) is invisible to
+   `bootstrap.yml` and survives any re-answer:
 
    ```bash
-   copier update --defaults --data 'extra_required_checks=["coverage/patch"]'
+   for id in $(gh api repos/{owner}/{repo}/rulesets --jq '.[].id'); do
+     gh api repos/{owner}/{repo}/rulesets/$id --jq '"\(.name): " + ([.rules[]
+       | select(.type=="required_status_checks")
+       | .parameters.required_status_checks[].context] | join(", "))'
+   done
    ```
+
+   The update pull request's CI posts `coverage/patch` instead, so while any
+   of them still requires `codecov/patch` that pull request waits on a
+   status that never comes. Before merging it:
+
+   - **A hand-made ruleset:** replace `codecov/patch` with
+     `coverage/patch` in it, or delete it if the template's `protect-main`
+     already covers what it enforces.
+   - **`extra_required_checks` lists `codecov/patch`:** merge with the
+     admin bypass. Afterwards, re-answer with `coverage/patch` in its place
+     (list every other check you require too), then re-run
+     `bootstrap.yml` so the template's rulesets pick it up:
+
+     ```bash
+     copier update --defaults --data 'extra_required_checks=["coverage/patch"]'
+     ```
 2. **Turn off Automatic Analysis** in SonarQube Cloud: the project's
    **Administration → Analysis Method**. SonarQube Cloud refuses a CI scan
    while it is on, so the next step would otherwise turn CI red.
