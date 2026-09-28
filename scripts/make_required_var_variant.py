@@ -59,7 +59,11 @@ def _replace_once(path: Path, old: str, new: str) -> None:
     src = path.read_text(encoding="utf-8")
     if src.count(old) != 1:
         sys.exit(f"{path}: expected exactly one occurrence of {old!r}")
-    path.write_text(src.replace(old, new, 1), encoding="utf-8")
+    # The data is this file's own content, edited; the path went through
+    # _within_cwd() above.  SonarCloud reads the file content as a tainted
+    # source for the write, which cannot traverse anywhere (#694).
+    updated = src.replace(old, new, 1)
+    path.write_text(updated, encoding="utf-8")  # NOSONAR(pythonsecurity:S2083)
 
 
 def main() -> None:

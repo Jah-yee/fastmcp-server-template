@@ -324,11 +324,13 @@ def _reexec_with_deps() -> bool:
     if os.environ.get("_SEEDED_REPORT_BOOTSTRAPPED") == "1":
         return True
     os.environ["_SEEDED_REPORT_BOOTSTRAPPED"] = "1"
-    forwarded = sys.argv[1:]
-    for arg in forwarded:
-        # Only text a flag, a revision or a path holds is forwarded (#694).
+    # Only text a flag, a revision or a path holds is forwarded, and only the
+    # arguments that passed the check go into the new list (#694).
+    forwarded: list[str] = []
+    for arg in sys.argv[1:]:
         if not re.fullmatch(r"[\w ./~^@{}:=+,-]*", arg, re.ASCII):
             return True
+        forwarded.append(arg)
     argv = [
         "uv",
         "run",

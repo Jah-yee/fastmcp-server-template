@@ -76,9 +76,11 @@ def inside(root: pathlib.Path, path: pathlib.Path) -> pathlib.Path:
 
 
 def _write_json(path: pathlib.Path, data: object) -> None:
-    path.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    # The data is the file's own JSON, edited; the path went through inside()
+    # and within_cwd() in the callers.  SonarCloud reads the file content as a
+    # tainted source for the write, which cannot traverse anywhere (#694).
+    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    path.write_text(text, encoding="utf-8")  # NOSONAR(pythonsecurity:S2083)
 
 
 def stamp_version(root: pathlib.Path, version: str) -> None:
