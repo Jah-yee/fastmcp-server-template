@@ -166,7 +166,7 @@ CI workflows reference two required repository secrets and one optional Claude t
 | Secret | Used by | How to generate |
 |---|---|---|
 | `RELEASE_TOKEN` | `release-prepare.yml`, `release.yml`, `copier-update.yml`, `renovate.yml`, `bootstrap.yml` | Fine-grained PAT at <https://github.com/settings/personal-access-tokens/new> with `contents: write`, `pull_requests: write`, and `administration: write` (bootstrap applies the repository rulesets, auto-merge, the security settings, and the About block). Must belong to a repository admin: the shipped rulesets grant bypass to the admin role, and the release tag + GitHub release that knope creates after a release pull request merges rely on it (pull requests the token opens also need it so their CI runs). Scoped to this repo. |
-| `SONAR_TOKEN` | `ci.yml` | <https://sonarcloud.io>: import the repository, then under **Administration → Analysis Method** turn off Automatic Analysis and choose GitHub Actions, which shows the token. Turn Automatic Analysis off first: SonarQube Cloud refuses a CI scan while it is on. Until the secret exists, CI skips the scan. |
+| `SONAR_TOKEN` | `ci.yml` | <https://sonarcloud.io>: after importing the repository, open its **Administration → Analysis Method** page. Turn Automatic Analysis off there first, because SonarQube Cloud refuses a CI scan while it is on; choosing GitHub Actions then shows the token. Until the secret exists, CI skips the scan. |
 | `CLAUDE_CODE_OAUTH_TOKEN` | `claude.yml`{% if enable_automatic_claude_review %}, `claude-code-review.yml`{% endif %} | Optional. Run `claude setup-token` locally and configure this only for `@claude` or opted-in automatic review. |
 
 ```bash
