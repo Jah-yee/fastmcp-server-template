@@ -1,5 +1,10 @@
 # Changelog
 
+## v11.0.1 (2026-09-28)
+
+- #706 fix(scripts): stamp_manifests writes through a handle, clearing S2083 downstream
+
+
 ## v11.0.0 (2026-09-28)
 
 - #703 test(scripts): measure the coverage the template's tests already give
