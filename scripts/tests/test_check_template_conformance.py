@@ -282,6 +282,50 @@ def test_read_revision_refuses_a_revision_that_reads_as_an_option(
     assert not started
 
 
+def test_output_is_written_inside_the_working_directory_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``--output`` is a write sink, guarded like the other paths (#694)."""
+    here = tmp_path / "repo"
+    here.mkdir()
+    monkeypatch.chdir(here)
+    assert c._parse_args(["--output", "drift.md"]).output == here / "drift.md"
+    with pytest.raises(SystemExit):
+        c._parse_args(["--output", str(tmp_path / "elsewhere.md")])
+
+
+@pytest.mark.parametrize(
+    "rev", ["HEAD", "HEAD~1", "origin/main", "v10.3.0", "a1b2c3d", "auto", "HEAD@{1}"]
+)
+def test_git_revision_accepts_real_revisions(rev: str) -> None:
+    assert c.git_revision(rev) == rev
+
+
+@pytest.mark.parametrize("rev", ["", "-x", "HEAD;rm", "HEAD rm", "HEAD\n"])
+def test_git_revision_refuses_anything_else(rev: str) -> None:
+    with pytest.raises(ValueError, match="revision"):
+        c.git_revision(rev)
+
+
+@pytest.mark.parametrize("module", [c, r])
+def test_reexec_refuses_to_forward_an_unexpected_argument(
+    module: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only argument text a revision, flag or path can contain is forwarded."""
+    monkeypatch.setitem(sys.modules, "copier", None)
+    for flag in ("_CONFORMANCE_BOOTSTRAPPED", "_SEEDED_REPORT_BOOTSTRAPPED"):
+        monkeypatch.delenv(flag, raising=False)
+    monkeypatch.setattr(sys, "argv", ["script", "--rev=HEAD;rm -rf /"])
+    started: list[list[str]] = []
+    monkeypatch.setattr(
+        module.os,  # type: ignore[attr-defined]
+        "execvpe",
+        lambda _f, argv, _e: started.append(argv),
+    )
+    assert module._reexec_with_deps() is True  # type: ignore[attr-defined]
+    assert not started
+
+
 @pytest.mark.parametrize("module", [c, r])
 def test_reexec_ends_uv_options_before_the_script(
     module: object, monkeypatch: pytest.MonkeyPatch

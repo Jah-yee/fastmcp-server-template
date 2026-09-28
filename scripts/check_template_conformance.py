@@ -374,9 +374,27 @@ def git_revision(value: str) -> str:
     Revisions reach git's command line; `--output=...` there is an option,
     not a commit (#694).  Also the argparse ``type=`` of every revision flag.
     """
-    if not value or value.startswith("-"):
-        raise ValueError(f"git revision {value!r} must not be empty or start with '-'")
+    if not re.fullmatch(r"\w[\w./~^@{}+-]*", value, re.ASCII):
+        raise ValueError(
+            f"git revision {value!r} must be a ref, tag, SHA or ~/^ expression"
+        )
     return value
+
+
+def output_path(value: str) -> Path:
+    """``--output`` canonicalised, refusing a path outside the working directory.
+
+    The report is a file in the checkout (`drift.md`, `.copier-template-drift.md`);
+    a path that resolves elsewhere is a broken or hostile invocation (#694).
+    The realpath-then-prefix shape is the one SonarCloud's path rules read.
+    """
+    resolved = os.path.realpath(value)
+    base_dir = os.path.realpath(os.getcwd())  # noqa: PTH109 - the shape Sonar reads
+    if resolved != base_dir and not resolved.startswith(base_dir + os.sep):
+        raise argparse.ArgumentTypeError(
+            f"--output {value!r} is outside the working directory"
+        )
+    return Path(resolved)
 
 
 def read_revision(rev: str) -> ReadProject:
@@ -561,6 +579,11 @@ def _reexec_with_deps() -> bool:
     if os.environ.get("_CONFORMANCE_BOOTSTRAPPED") == "1":
         return True
     os.environ["_CONFORMANCE_BOOTSTRAPPED"] = "1"
+    forwarded = sys.argv[1:]
+    for arg in forwarded:
+        # Only text a flag, a revision or a path holds is forwarded (#694).
+        if not re.fullmatch(r"[\w ./~^@{}:=+,-]*", arg, re.ASCII):
+            return True
     argv = [
         "uv",
         "run",
@@ -572,7 +595,7 @@ def _reexec_with_deps() -> bool:
         "--",
         "python",
         __file__,
-        *sys.argv[1:],
+        *forwarded,
     ]
     try:
         os.execvpe("uv", argv, os.environ)
@@ -604,7 +627,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="pre-push mode: pass with a warning when the comparison cannot be made",
     )
     parser.add_argument(
-        "--output", type=Path, help="write the markdown report here instead of stdout"
+        "--output",
+        type=output_path,
+        help="write the markdown report here instead of stdout",
     )
     return parser.parse_args(argv)
 
