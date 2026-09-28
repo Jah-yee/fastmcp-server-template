@@ -1,5 +1,10 @@
 # Changelog
 
+## v11.0.2 (2026-09-28)
+
+- #707 fix: wrap the identity call; build task-backend test configs from the environment
+
+
 ## v11.0.1 (2026-09-28)
 
 - #706 fix(scripts): stamp_manifests writes through a handle, clearing S2083 downstream
