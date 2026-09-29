@@ -1,3 +1,8 @@
+---
+description: "Where each piece of documentation belongs, and who owns it."
+kind: explanation
+---
+
 # Documentation structure
 
 This page states where each piece of this project's documentation belongs and who owns it. It applies to every page in `docs/` and to `README.md`. Read it before adding or moving a page; agents run the `writing-documentation` skill, which applies it step by step.
@@ -29,6 +34,19 @@ The site is organised by what its reader is trying to do. The template owns this
 | Contribute | someone changing the project | how-to or explanation |
 
 Moving a template page between sections is a template change, and the page keeps its file path and URL when it moves.
+
+## Front matter and llms.txt
+
+Every page opens with front matter naming its kind and saying what it's for:
+
+```yaml
+---
+description: "One sentence on what the page is for."
+kind: how-to
+---
+```
+
+`kind` is `tutorial`, `how-to`, `reference` or `explanation`, following the Sections table. The site's `llms.txt`, the index language-model clients read, is built from `nav:` when the site builds, with one section per top-level nav entry and each page's `description` beside it. A published page outside the nav appears in the section of a nav page in the same directory. No second list needs keeping in step: a page reaches `llms.txt` by being in the nav or next to a page that is, and its line there is only as good as its `description`.
 
 ## Where documentation goes
 
