@@ -18,4 +18,4 @@ Every tool runs with the server's own privileges; the [security model](../../sec
 | Tools | [`ping`](tools.md#ping) | Ping | Check that the service is alive; returns `pong`. |
 {% if include_mcp_apps_scaffold %}| Server apps | [`get_status`](server_apps.md#get_status) | `get_status` | Return server status (app-only; hidden from the LLM). |
 | Server apps | [`get_info`](server_apps.md#get_info) | `get_info` | Return server info (app-only; hidden from the LLM). |
-{% endif %}| Server info | [`get_server_info`](server_info.md#get_server_info) | Server Info | Report the version information of {{ project_name }}; returns `server_name`, `server_version`, `core_version` and, when configured, the upstream service's version. |
+{% endif %}| Server info | [`get_server_info`](server_info.md#get_server_info) | Server Info | Report the version information of {{ project_name }}; returns `server_name`, `server_version`, `core_version`, the MCP protocol revisions supported and the revision and client of this connection, and, when configured, the upstream service's version. |

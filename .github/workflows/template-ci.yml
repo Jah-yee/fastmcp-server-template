@@ -305,14 +305,23 @@ jobs:
           uv run --no-sync --no-build python scripts/check_docs_structure.py --strict
           .venv/bin/python scripts/check_docs_structure.py --strict --root /tmp/smoke-authz-off
 
-      - name: generated reference (the shipped pages equal a fresh generation)
+      - name: generated reference (the scaffold's own page equals a fresh generation)
         # scripts/gen_reference.py (#716) needs the installed project, so it
         # cannot run in copier's _tasks; the template ships the scaffold's
-        # pages and this step proves they are what the generator writes.
+        # pages. Pages for tools pvl-core registers (get_server_info) carry
+        # pvl-core's docstrings, which change with its releases, so equality
+        # is asserted only for the page the template owns (tools.md: ping);
+        # the rest is regenerated, then `--check` proves the generator is
+        # idempotent on what it just wrote.
         working-directory: /tmp/smoke
         run: |
-          uv run --no-sync --no-build python scripts/gen_reference.py --check
-          (cd /tmp/smoke-authz-off && /tmp/smoke/.venv/bin/python scripts/gen_reference.py --check)
+          for d in /tmp/smoke /tmp/smoke-authz-off; do
+            cp "$d/docs/reference/tools/tools.md" /tmp/tools-shipped.md
+            (cd "$d" && /tmp/smoke/.venv/bin/python scripts/gen_reference.py)
+            diff -u /tmp/tools-shipped.md "$d/docs/reference/tools/tools.md" \
+              || { echo "::error::$d: the shipped docs/reference/tools/tools.md differs from a fresh generation — regenerate the template's shipped page"; exit 1; }
+            (cd "$d" && /tmp/smoke/.venv/bin/python scripts/gen_reference.py --check)
+          done
 
       - name: ruff check
         working-directory: /tmp/smoke
