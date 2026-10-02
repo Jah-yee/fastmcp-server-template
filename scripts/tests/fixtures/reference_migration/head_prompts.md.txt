@@ -1,0 +1,20 @@
+---
+description: "The prompt templates this server offers to MCP clients."
+kind: reference
+---
+
+# Prompts
+
+MCP prompts are reusable prompt templates exposed to clients; the ones this
+server provides are listed below.
+
+<!-- DOMAIN-PROMPTS-LIST-START -->
+## Built-in prompts
+
+_None yet._
+<!-- Replace with this server's prompts — one section per prompt with its
+     arguments, usage, and example output. Define them with
+     `@mcp.prompt(...)` decorators in src/smoke_mcp/prompts.py
+     (see https://gofastmcp.com/servers/prompts). Kept across copier
+     update. -->
+<!-- DOMAIN-PROMPTS-LIST-END -->

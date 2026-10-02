@@ -58,35 +58,37 @@ extra_css:
 
 plugins:
   - search
+  # Keeps a moved page's old URL working. The entries above the project
+  # block are the template's own moves; a project that moves one of its
+  # pages adds `old-page.md: new-page.md` inside the block.
+  - redirects:
+      redirect_maps:
+        configuration.md: reference/configuration.md
+        configuration-generator.md: reference/configuration-generator.md
+        tools/index.md: reference/tools/index.md
+        prompts.md: reference/prompts.md
+        guides/security-model.md: security-model.md
+        installation.md: get-started/installation.md
+        deployment/claude-desktop.md: get-started/claude-desktop.md
+        deployment/docker.md: deploy/docker.md
+        guides/authentication.md: deploy/authentication.md
+        deployment/oidc.md: deploy/oidc.md
+{% if enable_authorization %}        guides/authorization.md: deploy/authorization.md
+{% endif %}        deployment/release-process.md: contribute/release-process.md
+        deployment/template-updates.md: contribute/template-updates.md
+        deployment/repository-protection.md: contribute/repository-protection.md
+        deployment/integration-branches.md: contribute/integration-branches.md
+        # PROJECT-REDIRECTS-START — this project's moved pages; kept across copier update
+        # PROJECT-REDIRECTS-END
   # Generates llms.txt + llms-full.txt for the README badge.
-  # Sections mirror `nav:` below — keep them aligned when customising
-  # (both blocks are sentinel-protected so customise both as a unit).
-  # `guides/*.md` and `deployment/*.md` use globs deliberately so new pages
-  # in those directories are auto-indexed without a sections-list update.
+  # The sections are filled from `nav:` at build time by
+  # scripts/llmstxt_sections_hook.py (registered under `hooks:`): one section
+  # per top-level nav entry, pages outside the nav joining the section of a
+  # nav page in their directory, descriptions from each page's `description:`
+  # front matter. Nothing to keep in step by hand.
   - llmstxt:
       full_output: llms-full.txt
-      sections:
-        # PROJECT-LLMSTXT-SECTIONS-START — keep aligned with `nav:` below;
-        # kept across copier update.
-        Getting Started:
-          - index.md
-          - installation.md
-          - configuration.md
-          - configuration-generator.md
-        Guides:
-          - guides/*.md
-        MCP Interface:
-          - tools/index.md
-          - prompts.md
-        Deployment:
-          - deployment/*.md
-        # Character-class prefix excludes the unversioned staging page while
-        # auto-indexing each canonical minor page.
-        Release Notes:
-          - releases/[0-9]*.[0-9]*.md
-        Contribute:
-          - contribute/*.md
-        # PROJECT-LLMSTXT-SECTIONS-END
+      sections: {}
   - mkdocstrings:
       handlers:
         python:
@@ -118,34 +120,70 @@ markdown_extensions:
   - attr_list
   - md_in_html
 
+hooks:
+  - scripts/llmstxt_sections_hook.py
+
 nav:
-  # PROJECT-NAV-START — replace with your real navigation; kept across copier
-  # update. Keep aligned with the `llmstxt` plugin's sentinel-protected
-  # `sections:` block above.
-  - Home: index.md
-  - Getting Started:
-      - Installation: installation.md
-      - Configuration: configuration.md
-      - Configuration Generator: configuration-generator.md
-  - Guides:
-      - Authentication: guides/authentication.md
-      - Security Model: guides/security-model.md
-{% if enable_authorization %}      - Authorization: guides/authorization.md
-{% endif %}  - MCP Interface:
-      - Tools: tools/index.md
-      - Prompts: prompts.md
-  - Deployment:
-      - Docker: deployment/docker.md
-      - OIDC Authentication: deployment/oidc.md
-      - Claude Desktop: deployment/claude-desktop.md
-      - Release Process: deployment/release-process.md
-      - Template Updates: deployment/template-updates.md
-      - Repository Protection: deployment/repository-protection.md
-      - Integration Branches: deployment/integration-branches.md
+  - Overview: index.md
+  - Security model: security-model.md
+  - Get started:
+      - Overview: get-started/index.md
+      - Claude Desktop: get-started/claude-desktop.md
+      - Claude Code: get-started/claude-code.md
+      - A remote server: get-started/http-client.md
+      - Installation: get-started/installation.md
+      # PROJECT-NAV-GET-STARTED-START — this server's first-run pages; kept across copier update
+      # PROJECT-NAV-GET-STARTED-END
+  - Deploy:
+      - Overview: deploy/index.md
+      - Docker: deploy/docker.md
+      - systemd and packages: deploy/systemd.md
+      - Authentication: deploy/authentication.md
+      - OIDC: deploy/oidc.md
+      - OIDC providers: deploy/oidc-providers.md
+      - Reverse proxy: deploy/reverse-proxy.md
+{% if include_mcp_apps_scaffold %}      - MCP Apps: deploy/mcp-apps.md
+{% endif %}      - Transfer links: deploy/transfer-links.md
+{% if enable_authorization %}      - Authorization: deploy/authorization.md
+{% endif %}      # PROJECT-NAV-DEPLOY-START — this server's deployment additions; kept across copier update
+      # PROJECT-NAV-DEPLOY-END
+  - Use:
+      - Overview: use/index.md
+      # PROJECT-NAV-USE-START — this server's how-tos and explanations (docs/use/); kept across copier update
+      # PROJECT-NAV-USE-END
+  # Reference is generated from the code by scripts/gen_reference.py; a fact
+  # on these pages changes at its source (docstring, annotation, CLI help).
+  - Reference:
+      - Configuration: reference/configuration.md
+      - Configuration generator: reference/configuration-generator.md
+      - Tools:
+          - Overview: reference/tools/index.md
+          # GENERATED-NAV-TOOLS-START — one entry per tool group; written by scripts/gen_reference.py
+          - Tools: reference/tools/tools.md
+{% if include_mcp_apps_scaffold %}          - Server apps: reference/tools/server_apps.md
+{% endif %}          - Server info: reference/tools/server_info.md
+          # GENERATED-NAV-TOOLS-END
+      - Resources: reference/resources.md
+      - Prompts: reference/prompts.md
+      - Command line: reference/cli.md
+      # PROJECT-NAV-REFERENCE-START — resources, CLI, API reference (docs/reference/api/); kept across copier update
+      # PROJECT-NAV-REFERENCE-END
   # Landing page only, deliberately: per-minor pages stay out of nav so a new
   # release never needs a nav edit (mkdocs treats not-in-nav pages as INFO,
   # so `--strict` stays green); the landing page and search link them.
-  - Release Notes: releases/index.md
+  - Upgrade:
+      - Overview: upgrade/index.md
+      - Release notes: releases/index.md
+      # PROJECT-NAV-UPGRADE-START — kept across copier update
+      # PROJECT-NAV-UPGRADE-END
   - Contribute:
+      - Overview: contribute/index.md
       - Documentation structure: contribute/docs-structure.md
-  # PROJECT-NAV-END
+      - Release process: contribute/release-process.md
+      - Template updates: contribute/template-updates.md
+      - Repository protection: contribute/repository-protection.md
+      - Integration branches: contribute/integration-branches.md
+      # PROJECT-NAV-CONTRIBUTE-START — kept across copier update
+      # PROJECT-NAV-CONTRIBUTE-END
+  # PROJECT-NAV-UNSORTED-START — entries the nav migration could not place; move each into a section above
+  # PROJECT-NAV-UNSORTED-END

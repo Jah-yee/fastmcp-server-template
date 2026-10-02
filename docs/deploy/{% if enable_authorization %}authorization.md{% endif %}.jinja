@@ -1,0 +1,117 @@
+---
+description: "Limit which tools, resources and prompts each caller may use."
+kind: how-to
+---
+
+# Authorization
+
+This server supports opt-in **authorization**, gating individual tools,
+resources, and prompts by *scope*. It is **off by default**: every
+authenticated caller can use everything. A component is gated only once
+it declares a required scope; one without is unrestricted regardless of
+caller.
+
+Two mechanisms decide which scopes a caller holds. Pick the one
+that matches how callers authenticate (see the
+[Authentication guide](authentication.md)):
+
+- **Bearer tokens → a subject ACL file.** A TOML file maps each caller's
+  subject to the scopes it holds. Point `{{ env_prefix }}_ACL_PATH` at
+  it. This is the only option for bearer callers.
+- **OIDC → an identity claim.** The server reads a claim the identity
+  provider issues about the user (group or role membership) and treats
+  its values as the caller's scopes. Set `{{ env_prefix }}_AUTHZ_CLAIM`
+  to that claim's name, such as `groups`.
+
+To turn either on, set that mechanism's `{{ env_prefix }}_*` variables,
+described in the sections below.
+
+## Gating by an OIDC claim
+
+Authorization reads OIDC **claims**, meaning what the identity provider
+asserts about the *user* (their groups/roles), not the OAuth scopes the
+client negotiated. Set `{{ env_prefix }}_AUTHZ_CLAIM` to the claim that
+carries the user's group/role list.
+
+**No mapping is needed when the names already match.** If your identity provider's
+group names are the same strings as your tool scopes, a caller is
+granted exactly the values in their claim, and there is nothing else to
+configure. Only when the two vocabularies differ do you supply a
+translation map in `{{ env_prefix }}_AUTHZ_GRANTS`, as inline JSON
+mapping each claim value to the scopes it grants:
+
+```json
+{"app-writers": ["read", "write"], "app-admins": ["*"]}
+```
+
+In this map, `"*"` grants every scope.
+
+## The ACL file (subject → scope)
+
+Point `{{ env_prefix }}_ACL_PATH` at a TOML file shaped like:
+
+```toml
+[subjects]
+"user:alice@example.com" = ["read", "write"]
+"user:admin@example.com" = ["*"]              # wildcard — any required scope passes
+"service:ci-bot"         = ["read"]
+```
+
+- **Subject strings are opaque.** The `<kind>:<id>` convention is
+  documentation only; each subject is matched as a literal string.
+- **`*` is the only special scope.** It grants every required scope.
+  Subject-side wildcards (`*` as a subject key) are rejected at startup.
+- **Scope vocabulary is yours.** Per-project or per-folder gating is
+  encoded into the scope string itself, such as `read:project-foo` or
+  `write:vault/personal`.
+
+### Aligning subjects with bearer tokens
+
+Subjects come from the authentication layer. See the
+[Authentication guide](authentication.md) for how bearer tokens and OIDC
+map callers to subject strings. The subject keyed in this ACL is the
+same string used as a *value* in the bearer-tokens TOML
+(`{{ env_prefix }}_BEARER_TOKENS_FILE`). Keep the two consistent. In
+single-token mode every caller shares one subject (the default
+`"bearer-anon"`, which you can change with
+`{{ env_prefix }}_BEARER_DEFAULT_SUBJECT`).
+
+## Operating notes
+
+- **Loaded once at startup.** Restart the server to pick up edits to the
+  ACL file or the grants map.
+- **Fails fast on a structural error.** An unreadable or malformed file,
+  the wrong shape, or a `*` subject key aborts startup rather than
+  running half-configured. Structural checks do not cover a
+  scope-name typo:
+  `"rite"` for `"write"` is valid and loads cleanly, then silently never
+  matches, so those calls are denied. Double-check scope spelling
+  against the table below.
+- **Meaningful only with authentication.** Over stdio, authorization is
+  bypassed entirely. On HTTP with no authentication configured there is
+  no caller to scope, so every gated component is denied. Run
+  authorization only alongside real authentication.
+- A denied call is rejected, and gated components a caller can't use are
+  hidden from `tools` / `resources` / `prompts` listings.
+
+## Gated tools
+
+<!-- DOMAIN-AUTHZ-SCOPES-START — list THIS server's gated tools; kept across copier update -->
+<!-- Replace with this server's tool→scope mapping. For each gated tool, also set
+     meta={"required_scope": "<scope>"} on its registration in tools.py. Example: -->
+| Tool | Required scope |
+|------|----------------|
+| `delete_entry` | `write` |
+| `search`       | `read`  |
+<!-- DOMAIN-AUTHZ-SCOPES-END -->
+
+## See also
+
+- [Authentication guide](authentication.md): how callers obtain the
+  subject and claims this guide gates on.
+
+<!-- DOMAIN-AUTHZ-EXTRA-START -->
+<!-- Project-specific authorization notes go here; kept across copier
+     update. (E.g. "the import tool requires the 'write:admin' scope",
+     "the CI service account uses the 'service:ci-bot' subject".) -->
+<!-- DOMAIN-AUTHZ-EXTRA-END -->

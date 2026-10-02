@@ -33,7 +33,7 @@ def _marker_pair(region_id: str) -> str:
     )
 
 
-# Every region docs/configuration.md declares for a render with
+# Every region docs/reference/configuration.md declares for a render with
 # enable_authorization off — REF-AUTHZ is deliberately absent, exactly as it
 # is in that render (the marker pair lives inside the same Jinja conditional
 # as the section heading), which also exercises the region-level
@@ -52,7 +52,7 @@ _REFERENCE_REGION_IDS = (
 
 
 def _reference_markers() -> str:
-    """Stand-in docs/configuration.md: every gate-on region's marker pair."""
+    """Stand-in docs/reference/configuration.md: every gate-on region's marker pair."""
     return "".join(_marker_pair(region_id) for region_id in _REFERENCE_REGION_IDS)
 
 
@@ -77,19 +77,18 @@ def fake_project(tmp_path):
     # `write_artifacts` drives off the real (template-root) config-
     # presentation.yml when a fixture project has none of its own, and that
     # file declares three `kind: splice` targets — the OIDC-REQUIRED/
-    # OIDC-OPTIONAL regions in both `docs/guides/authentication.md` and
-    # `docs/deployment/oidc.md`, plus README.md's own CORE/DOMAIN regions.
+    # OIDC-OPTIONAL regions in both `docs/deploy/authentication.md` and
+    # `docs/deploy/oidc.md`, plus README.md's own CORE/DOMAIN regions.
     # Unlike a whole-file artifact, a spliced file must already exist on disk
     # with every one of its marker pairs in place, so every fixture project
     # needs minimal stand-ins here.
-    auth_dir = tmp_path / "docs" / "guides"
+    auth_dir = tmp_path / "docs" / "deploy"
     auth_dir.mkdir(parents=True)
     (auth_dir / "authentication.md").write_text(
         _marker_pair("OIDC-REQUIRED") + _marker_pair("OIDC-OPTIONAL"),
         encoding="utf-8",
     )
-    oidc_dir = tmp_path / "docs" / "deployment"
-    oidc_dir.mkdir(parents=True)
+    oidc_dir = auth_dir
     (oidc_dir / "oidc.md").write_text(
         _marker_pair("OIDC-REQUIRED") + _marker_pair("OIDC-OPTIONAL"),
         encoding="utf-8",
@@ -98,7 +97,8 @@ def fake_project(tmp_path):
         _marker_pair("CORE") + _marker_pair("DOMAIN"),
         encoding="utf-8",
     )
-    (tmp_path / "docs" / "configuration.md").write_text(
+    (tmp_path / "docs" / "reference").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "reference" / "configuration.md").write_text(
         _reference_markers(), encoding="utf-8"
     )
     _seed_server_json(tmp_path)
@@ -2543,29 +2543,29 @@ class TestSpliceRegion:
         when two files declare the same region id — the message must name
         *source* too."""
         broken = self._DOC.replace("<!-- GENERATED-ENV-TABLE-AUTH-END -->\n", "")
-        with pytest.raises(SystemExit, match=r"docs/deployment/oidc\.md"):
-            g.splice_region(broken, "AUTH", "NEW", source="docs/deployment/oidc.md")
+        with pytest.raises(SystemExit, match=r"docs/deploy/oidc\.md"):
+            g.splice_region(broken, "AUTH", "NEW", source="docs/deploy/oidc.md")
 
     def test_same_region_id_broken_in_two_files_yields_distinct_messages(self):
-        """The concrete ambiguity this fixes: `docs/deployment/oidc.md` and
-        `docs/guides/authentication.md` both declare `OIDC-REQUIRED`/
+        """The concrete ambiguity this fixes: `docs/deploy/oidc.md` and
+        `docs/deploy/authentication.md` both declare `OIDC-REQUIRED`/
         `OIDC-OPTIONAL`. Breaking the same-id marker in each must not raise
         byte-identical text — an operator hitting the marker-drop hazard
         needs the message to say which file to fix."""
         broken = self._DOC.replace("<!-- GENERATED-ENV-TABLE-AUTH-END -->\n", "")
 
         with pytest.raises(SystemExit) as exc_oidc:
-            g.splice_region(broken, "AUTH", "NEW", source="docs/deployment/oidc.md")
+            g.splice_region(broken, "AUTH", "NEW", source="docs/deploy/oidc.md")
         with pytest.raises(SystemExit) as exc_auth:
             g.splice_region(
-                broken, "AUTH", "NEW", source="docs/guides/authentication.md"
+                broken, "AUTH", "NEW", source="docs/deploy/authentication.md"
             )
 
         message_oidc = str(exc_oidc.value)
         message_auth = str(exc_auth.value)
         assert message_oidc != message_auth
-        assert "docs/deployment/oidc.md" in message_oidc
-        assert "docs/guides/authentication.md" in message_auth
+        assert "docs/deploy/oidc.md" in message_oidc
+        assert "docs/deploy/authentication.md" in message_auth
 
     def test_both_markers_on_one_line_raises(self):
         """Splicing a one-line region cannot express "the lines between the
@@ -2838,11 +2838,13 @@ def _core_table(project_root: Path) -> str:
 def _domain_table(project_root: Path) -> str:
     """Write every artifact for *project_root*, return the configuration
     reference's spliced REF-DOMAIN region body (between its
-    GENERATED-ENV-TABLE-REF-DOMAIN markers in docs/configuration.md) — the
+    GENERATED-ENV-TABLE-REF-DOMAIN markers in docs/reference/configuration.md) — the
     region that renders every domain var. README.md's DOMAIN region is a
     curated `readme`-tagged subset and would be empty for these fixtures."""
     g.write_artifacts(project_root, check=False)
-    text = (project_root / "docs" / "configuration.md").read_text(encoding="utf-8")
+    text = (project_root / "docs" / "reference" / "configuration.md").read_text(
+        encoding="utf-8"
+    )
     return text.split("GENERATED-ENV-TABLE-REF-DOMAIN-START")[1].split(
         "GENERATED-ENV-TABLE-REF-DOMAIN-END"
     )[0]
@@ -2867,70 +2869,11 @@ def _table_rows_by_variable(table: str, default_column: int) -> dict[str, str]:
 
 
 class TestReadmeRegions:
-    """README.md's own `kind: splice` regions: CORE (a curated landing-page
-    subset — tag `readme`, non-domain provenances) and DOMAIN (the
-    project's own curated subset — tag `readme`, provenance `domain`).
-    Unlike the OIDC docs, both are hand-picked few-var selections, not
-    section-wide selectors — these tests pin that shape down; the full
-    domain surface renders in docs/configuration.md's REF-DOMAIN region."""
-
-    def test_core_table_is_the_readme_tagged_subset(self, fake_project):
-        answers = g.load_answers(fake_project)
-        vars_ = [v for v in g.collect_vars(fake_project, answers) if "readme" in v.tags]
-        table = g.render_md_table(vars_, ["variable", "default", "description"])
-        assert "DEMO_MCP_LOG_LEVEL" in table
-        assert "DEMO_MCP_KV_STORE_URL" in table
-        assert "DEMO_MCP_OIDC_CLIENT_SECRET" not in table
-
-    def test_core_table_kv_store_url_default_cell_matches_pre_generation_content(
-        self, fake_project, template_root
-    ):
-        """The generated CORE table's content must equal the pre-generation
-        hand-written Configuration table. `kv_store_url`'s own dataclass
-        default is `None` (core derives `file:///data/state` at runtime,
-        outside this field) — without a `documented_defaults:` entry the
-        Default cell regresses to a bare `(none)`, silently breaking that
-        equal-content promise."""
-        answers = g.load_answers(fake_project)
-        presentation = g.load_presentation(template_root, str(answers["env_prefix"]))
-        vars_ = [v for v in g.collect_vars(fake_project, answers) if "readme" in v.tags]
-        table = g.render_md_table(
-            vars_,
-            ["variable", "default", "description"],
-            documented_defaults=presentation.get("documented_defaults", {}),
-        )
-        rows = {
-            ln.split("|")[1].strip(): ln.split("|")[2].strip()
-            for ln in table.splitlines()[2:]
-        }
-        assert rows["`DEMO_MCP_KV_STORE_URL`"] == "`file:///data/state`"
-
-    def test_core_table_content_is_exactly_the_three_expected_rows(self, fake_project):
-        """CORE-content regression guard, through the real README splice path
-        (`write_artifacts`, not `render_md_table` called directly): the
-        generated CORE table must carry exactly these three vars with these
-        Default cells — as a SET, not a sequence. `collect_vars`'s
-        core-then-template-then-external provenance ordering is a
-        determinism contract this task doesn't fight (see
-        `TestCollectVars::test_provenance_order_is_core_then_template_then_external`),
-        so it is free to reorder these three rows without that counting as
-        a content regression; only the row set and each row's Default cell
-        are pinned here. A future `collect_vars` change that drops a var,
-        adds an unexpected one, or silently changes a default must fail
-        this test."""
-        table = _core_table(fake_project)
-        rows = _table_rows_by_variable(table, default_column=2)
-        assert rows == {
-            "`DEMO_MCP_LOG_LEVEL`": "`INFO`",
-            "`DEMO_MCP_LOG_FORMAT`": "(none)",
-            "`DEMO_MCP_KV_STORE_URL`": "`file:///data/state`",
-        }
-
-    def test_core_table_stays_small(self, fake_project):
-        """The landing page carries a curated subset, not the full surface."""
-        answers = g.load_answers(fake_project)
-        vars_ = [v for v in g.collect_vars(fake_project, answers) if "readme" in v.tags]
-        assert len(vars_) <= 5
+    """README.md's one `kind: splice` region: DOMAIN, the project's own
+    curated subset (tag `readme`, provenance `domain`). A hand-picked few-var
+    selection, not a section-wide selector; the shared variables left the
+    README for the generated reference (#717), and the full domain surface
+    renders in docs/reference/configuration.md's REF-DOMAIN region."""
 
     def test_domain_table_uses_the_four_column_shape(self, fake_project):
         answers = g.load_answers(fake_project)
@@ -3010,17 +2953,13 @@ class TestReadmeRegions:
         assert rows["`DEMO_MCP_VAULT_PATH`"] == "No"
         assert rows["`DEMO_MCP_API_KEY`"] == "No"
 
-    def test_readme_splice_writes_both_regions(self, fake_project):
-        """End-to-end: `write_artifacts` must splice README.md's CORE and
-        DOMAIN regions in place, leaving the surrounding hand-authored text
-        untouched."""
+    def test_readme_splice_writes_the_domain_region_only(self, fake_project):
+        """End-to-end: `write_artifacts` splices README.md's DOMAIN region in
+        place, leaves the hand-authored text untouched, and writes no CORE
+        table: the shared variables live in the generated reference."""
         (fake_project / "README.md").write_text(
             "# Demo MCP\n\n"
             "## Configuration\n\n"
-            "<!-- GENERATED-ENV-TABLE-CORE-START — generated by "
-            "scripts/gen_config_surface.py; do not edit -->\n"
-            "<!-- GENERATED-ENV-TABLE-CORE-END -->\n\n"
-            "## Domain configuration\n\n"
             "<!-- GENERATED-ENV-TABLE-DOMAIN-START — generated by "
             "scripts/gen_config_surface.py; do not edit -->\n"
             "<!-- GENERATED-ENV-TABLE-DOMAIN-END -->\n",
@@ -3031,28 +2970,12 @@ class TestReadmeRegions:
         text = (fake_project / "README.md").read_text(encoding="utf-8")
 
         assert "# Demo MCP" in text
-        assert "DEMO_MCP_LOG_LEVEL" in text
-        core_table = text.split("GENERATED-ENV-TABLE-CORE-START")[1].split(
-            "GENERATED-ENV-TABLE-CORE-END"
-        )[0]
-        assert "| Variable | Default | Description |" in core_table
+        assert "GENERATED-ENV-TABLE-CORE" not in text
+        assert "DEMO_MCP_LOG_LEVEL" not in text
         domain_table = text.split("GENERATED-ENV-TABLE-DOMAIN-START")[1].split(
             "GENERATED-ENV-TABLE-DOMAIN-END"
         )[0]
-        # The fixture has no `readme`-tagged domain fields, so the curated
-        # DOMAIN region renders its declared empty_note, not a bare table.
-        assert "configuration reference" in domain_table
-        assert "| Variable |" not in domain_table
-
-
-class TestReadmeDomainHostileHelp:
-    """The DOMAIN description column renders text a downstream author
-    wrote, not text this template controls. Exercised end to end through the
-    real README splice path (`write_artifacts`, not `render_md_table` called
-    directly) — that path is what threads `config-presentation.yml`'s real
-    `required_vars:` (which contains none of these domain vars) through
-    `_is_required`'s domain-provenance branch, a path no other test in this
-    module exercises."""
+        assert "No variables are featured here yet" in domain_table
 
     def test_pipe_in_help_does_not_break_the_table_row(
         self, domain_project_hostile_help
@@ -3381,7 +3304,9 @@ class TestConfigurationReference:
         Persistence section (declared first), appearing exactly once in the
         whole reference."""
         g.write_artifacts(fake_project, check=False)
-        text = (fake_project / "docs" / "configuration.md").read_text(encoding="utf-8")
+        text = (fake_project / "docs" / "reference" / "configuration.md").read_text(
+            encoding="utf-8"
+        )
         persistence = text.split("REF-PERSISTENCE-START")[1].split(
             "REF-PERSISTENCE-END"
         )[0]
@@ -3396,7 +3321,9 @@ class TestConfigurationReference:
         answers = g.load_answers(fake_project)
         vars_ = g.collect_vars(fake_project, answers)
         g.write_artifacts(fake_project, check=False, vars_=vars_)
-        text = (fake_project / "docs" / "configuration.md").read_text(encoding="utf-8")
+        text = (fake_project / "docs" / "reference" / "configuration.md").read_text(
+            encoding="utf-8"
+        )
         missing = [v.name for v in vars_ if f"`{v.name}`" not in text]
         assert missing == []
 
@@ -3590,7 +3517,7 @@ class TestMarkdownVocabularyNormalisation:
         ]
 
         g.write_artifacts(fake_project, check=False, vars_=patched)
-        for rel in ("docs/guides/authentication.md", "docs/deployment/oidc.md"):
+        for rel in ("docs/deploy/authentication.md", "docs/deploy/oidc.md"):
             text = (fake_project / rel).read_text(encoding="utf-8")
             assert var.name in text  # sanity: the var reached this page
             assert "JWTs" not in text, rel

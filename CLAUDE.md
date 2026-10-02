@@ -215,7 +215,7 @@ generated project it is the rendered section from `AGENTS.md.jinja`.
 
 `.github/rulesets/*` ship to generated projects, where the rendered
 `bootstrap.yml` applies them (posture documented in
-`docs/deployment/repository-protection.md.jinja`).  The `main` and
+`docs/contribute/repository-protection.md.jinja`).  The `main` and
 `release/*` rulesets are `.json.jinja`: they require the generated `ci.yml`'s aggregate
 `CI Success` check plus whatever the project listed in the
 `extra_required_checks` answer, the seam that lets a domain check outside
