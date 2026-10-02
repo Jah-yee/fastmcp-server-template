@@ -73,7 +73,7 @@ request whose body carries the version delta, the
 template's release notes, the applicable `UPGRADING.md` sections and the
 resolution policy. Working through that pull request, by hand or with a
 coding agent, is documented in the generated project's
-`docs/deployment/template-updates.md` and in the `applying-template-updates`
+`docs/contribute/template-updates.md` and in the `applying-template-updates`
 skill it ships. The one trap worth knowing before reading either: files
 under `_skip_if_exists` in `copier.yml` are seeded once and never
 re-rendered, so a template change to one of them has to be applied by hand.

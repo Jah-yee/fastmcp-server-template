@@ -18,6 +18,6 @@ for the step-by-step guide to customising this template for your own MCP server.
 
 ## Authentication
 
-See [Authentication guide](guides/authentication.md) for bearer token, OIDC,
+See [Authentication guide](deploy/authentication.md) for bearer token, OIDC,
 and multi-auth setup — this guide is generic and applies to all servers built
 from this template.

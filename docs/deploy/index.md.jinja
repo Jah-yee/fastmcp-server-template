@@ -1,0 +1,19 @@
+---
+description: "Run {{ human_name }} for real: Docker, authentication, OIDC and a reverse proxy."
+kind: how-to
+---
+
+# Deploy
+
+These pages are for an operator running the server for others over HTTP, as a container or a system service, with every caller authenticated. Each page covers one task.
+
+- [Docker](docker.md): the image, Compose, ports, volumes and health checks.
+- [Authentication](authentication.md): bearer tokens or OIDC, and when to use which.
+- [OIDC](oidc.md): the two OIDC modes, the identity provider's side, and running under a path prefix behind a proxy.
+{% if enable_authorization %}- [Authorization](authorization.md): gating individual tools by scope, once callers are authenticated.
+{% endif %}
+Before exposing the server, read the [security model](../security-model.md): an authenticated caller has every tool the instance exposes, and under OIDC the identity provider alone decides who gets in.
+
+<!-- DOMAIN-DEPLOY-INTRO-START -->
+<!-- What deploying this server adds to the generic picture (data it needs mounted, services it calls); kept across copier update. -->
+<!-- DOMAIN-DEPLOY-INTRO-END -->

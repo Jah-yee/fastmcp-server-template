@@ -20,7 +20,7 @@ The server supports five authentication modes:
 | **Bearer token** | Simple deployments behind a VPN, Docker compose stacks, development | Set `{{ env_prefix }}_BEARER_TOKEN` only |
 | **OIDC (remote)** | Production with user identity, SSO, multi-user access; local JWKS validation, no confidential client to register | Set `{{ env_prefix }}_BASE_URL` + `{{ env_prefix }}_OIDC_CONFIG_URL` only |
 | **OIDC (oidc-proxy)** | The same, where the server should run the OAuth flow itself and manage sessions | Set all four OIDC variables (`BASE_URL`, `OIDC_CONFIG_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`) |
-| **No auth** | Local stdio usage, trusted networks; see [Security model](security-model.md) | Default (nothing to configure) |
+| **No auth** | Local stdio usage, trusted networks; see [Security model](../security-model.md) | Default (nothing to configure) |
 
 When both bearer token and OIDC are configured, the server accepts **either** credential: a valid bearer token or a valid OIDC session. This is useful when different clients require different authentication flows against the same server instance.
 
@@ -137,7 +137,7 @@ Client → {{ project_name }} → OIDC Provider
 
 For the full OIDC reference (env vars, Docker Compose, subpath deployments, architecture):
 
-- [OIDC Authentication reference](../deployment/oidc.md)
+- [OIDC Authentication reference](oidc.md)
 
 ---
 
@@ -168,7 +168,7 @@ Authentication only works with HTTP transport. If you're using `--transport stdi
 ### OIDC redirect fails
 
 - Verify `BASE_URL` matches your public URL exactly (including any subpath prefix)
-- For subpath deployments, see the [subpath deployment guide](../deployment/oidc.md#subpath-deployments); `BASE_URL` must include the prefix, `HTTP_PATH` must not
+- For subpath deployments, see the [subpath deployment guide](oidc.md#subpath-deployments); `BASE_URL` must include the prefix, `HTTP_PATH` must not
 - Check that `redirect_uris` in your provider config includes your callback URL (such as `https://mcp.example.com/auth/callback`)
 
 ### Session drops after token expiry

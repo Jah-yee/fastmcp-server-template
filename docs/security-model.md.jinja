@@ -5,13 +5,13 @@ kind: explanation
 
 # Security model
 
-This page states what {{ project_name }} protects and what it leaves to the operator. [Authentication](authentication.md) covers how to configure each mode, and `SECURITY.md` in the repository covers how to report a vulnerability.
+This page states what {{ project_name }} protects and what it leaves to the operator. [Authentication](deploy/authentication.md) covers how to configure each mode, and `SECURITY.md` in the repository covers how to report a vulnerability.
 
 ## Authentication is the boundary
 
-Over HTTP, authentication is the only access control: a bearer token, a mapped bearer token file, or OIDC. A request without a valid credential is refused before it reaches a tool.{% if enable_authorization %} [Authorization](authorization.md) then narrows which tools an authenticated caller may use.{% endif %} It is the same model as any other MCP server reached over HTTP.
+Over HTTP, authentication is the only access control: a bearer token, a mapped bearer token file, or OIDC. A request without a valid credential is refused before it reaches a tool.{% if enable_authorization %} [Authorization](deploy/authorization.md) then narrows which tools an authenticated caller may use.{% endif %} It is the same model as any other MCP server reached over HTTP.
 
-With OIDC, which credentials the server accepts depends on the [mode](../deployment/oidc.md#auth-modes):
+With OIDC, which credentials the server accepts depends on the [mode](deploy/oidc.md#auth-modes):
 
 - **`oidc-proxy`:** the server is the OAuth client registered with the identity provider and runs the sign-in itself. Anyone the provider lets sign in to that client gets through.
 - **`remote`:** the server is a resource server. MCP clients get tokens from the provider on their own, and the server accepts any unexpired token the provider's issuer signed, unless `{{ env_prefix }}_OIDC_AUDIENCE` or `{{ env_prefix }}_OIDC_REQUIRED_SCOPES` narrows that down.
@@ -30,7 +30,7 @@ Over stdio there is no network listener and no authentication. The MCP client st
 
 ## What an authenticated caller can reach
 
-An authenticated caller has every tool the instance exposes. Each tool runs with the server's own privileges: its filesystem and network access, and any credential in its configuration. `{{ env_prefix }}_TOOLS_ALLOW` and `{{ env_prefix }}_TOOLS_DENY` trim that set for an instance; see [Configuration](../reference/configuration.md).
+An authenticated caller has every tool the instance exposes. Each tool runs with the server's own privileges: its filesystem and network access, and any credential in its configuration. `{{ env_prefix }}_TOOLS_ALLOW` and `{{ env_prefix }}_TOOLS_DENY` trim that set for an instance; see [Configuration](reference/configuration.md).
 
 <!-- DOMAIN-SECURITY-MODEL-SURFACE-START — what THIS server's tools reach; kept across copier update -->
 <!-- Replace with what this server's tools can do with the server's privileges:
@@ -42,15 +42,15 @@ An authenticated caller has every tool the instance exposes. Each tool runs with
 
 Some routes answer anyone who can reach the port, with authentication on or off:
 
-- `/health` and `/health/ready`. `{{ env_prefix }}_HEALTH_DETAIL` decides how much they say; see [Health](../deployment/docker.md#health).
+- `/health` and `/health/ready`. `{{ env_prefix }}_HEALTH_DETAIL` decides how much they say; see [Health](deploy/docker.md#health).
 - In the OIDC modes, the OAuth metadata and sign-in routes a client uses before it holds a token.
 
 ## What the operator is responsible for
 
 - **TLS.** The server speaks plain HTTP. Terminate TLS at a reverse proxy in front of it.
-- **Exposure.** Which interfaces and networks can reach the port. [Ports](../deployment/docker.md#ports) covers the published port of the Docker deployment.
+- **Exposure.** Which interfaces and networks can reach the port. [Ports](deploy/docker.md#ports) covers the published port of the Docker deployment.
 - **Secrets.** Bearer tokens, OIDC client secrets and the credentials the tools use live in the environment or in files you control. Anyone who can read them can act as the server.
-- **The debugger port.** A debug build's debugger port grants code execution to anyone who reaches it; see [Remote debugging](../deployment/docker.md#remote-debugging).
+- **The debugger port.** A debug build's debugger port grants code execution to anyone who reaches it; see [Remote debugging](deploy/docker.md#remote-debugging).
 
 ## Host and Origin validation
 

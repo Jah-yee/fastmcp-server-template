@@ -27,7 +27,7 @@ recognise it as the project's decay, not to rationalise it. An update is done
 when every template-owned file conforms or has a Decay issue, not when the
 markers are gone.
 
-`docs/deployment/template-updates.md` explains the update for a human; this
+`docs/contribute/template-updates.md` explains the update for a human; this
 skill is the procedure. Work on the `copier/update` branch the workflow
 opened (or the branch where `copier update --trust` was run). Stop and ask,
 rather than guess, at three points: a conflict hunk inside a sentinel block,
@@ -143,7 +143,7 @@ either way.
 ## 7. Refresh and gate
 
 `uv lock` when a dependency floor changed, then the update gate from
-`docs/deployment/template-updates.md`, in full: `git diff --check`, the
+`docs/contribute/template-updates.md`, in full: `git diff --check`, the
 conflict-marker grep, `uv lock --check`, `uv sync --all-extras --all-groups
 --locked`, `uv run python scripts/gen_config_surface.py --check`, `uv run python scripts/gen_reference.py --check`, ruff check
 and format, mypy, pytest, `uv run mkdocs build --strict`, `uv run pre-commit

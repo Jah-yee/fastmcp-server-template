@@ -5,7 +5,7 @@ kind: tutorial
 
 # Installation
 
-Before you expose the server beyond your own machine, read the [security model](guides/security-model.md).
+Before you expose the server beyond your own machine, read the [security model](../security-model.md).
 
 ## From PyPI
 
@@ -19,7 +19,7 @@ pip install {{ pypi_name }}
 docker pull {{ docker_registry }}/{{ project_name }}:latest
 ```
 
-The `latest` tag is the newest stable release. The rolling `edge` tag tracks every merge to `main` and carries no version identity; see [Image tags](deployment/docker.md#image-tags) for the full list.
+The `latest` tag is the newest stable release. The rolling `edge` tag tracks every merge to `main` and carries no version identity; see [Image tags](../deploy/docker.md#image-tags) for the full list.
 
 ## From source
 

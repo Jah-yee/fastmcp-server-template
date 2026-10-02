@@ -49,36 +49,43 @@ from published_examples import PYTHON_LANGS, blocks, exclude_patterns, excluded
 TEMPLATE_PAGES = frozenset(
     {
         "index.md",
-        "installation.md",
+        "security-model.md",
+        "get-started/index.md",
+        "get-started/installation.md",
+        "get-started/claude-desktop.md",
+        "deploy/index.md",
+        "deploy/docker.md",
+        "deploy/authentication.md",
+        "deploy/oidc.md",
+        "deploy/authorization.md",
+        "upgrade/index.md",
+        "contribute/index.md",
+        "contribute/release-process.md",
+        "contribute/repository-protection.md",
+        "contribute/template-updates.md",
+        "contribute/integration-branches.md",
         "reference/configuration.md",
         "reference/configuration-generator.md",
         "reference/tools/index.md",
         "reference/resources.md",
         "reference/prompts.md",
         "reference/cli.md",
-        "guides/authentication.md",
-        "guides/security-model.md",
-        "guides/authorization.md",
-        "deployment/claude-desktop.md",
-        "deployment/docker.md",
-        "deployment/oidc.md",
-        "deployment/release-process.md",
-        "deployment/repository-protection.md",
-        "deployment/template-updates.md",
-        "deployment/integration-branches.md",
         "use/index.md",
         "contribute/docs-structure.md",
         "releases/index.md",
     }
 )
 DESIGNATED = ("use/", "reference/api/", "releases/")
-SECURITY_MODEL = "guides/security-model.md"
+SECURITY_MODEL = "security-model.md"
 ENTRY_PAGES = (
     "index.md",
-    "installation.md",
-    "deployment/claude-desktop.md",
-    "deployment/docker.md",
+    "get-started/index.md",
+    "get-started/installation.md",
+    "get-started/claude-desktop.md",
+    "deploy/index.md",
+    "deploy/docker.md",
     "use/index.md",
+    "upgrade/index.md",
     "contribute/docs-structure.md",
 )
 KINDS = frozenset({"tutorial", "how-to", "reference", "explanation"})

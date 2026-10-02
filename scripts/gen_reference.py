@@ -58,7 +58,7 @@ MARKER = (
 GROUP_TAG = "group:"
 NAV_START = "GENERATED-NAV-TOOLS-START"
 NAV_END = "GENERATED-NAV-TOOLS-END"
-SECURITY_MODEL = "../../guides/security-model.md"
+SECURITY_MODEL = "../../security-model.md"
 
 # The Google-style headings FastMCP strips from a docstring when it builds
 # the wire description; the same set tests/test_model_facing_text.py pins.

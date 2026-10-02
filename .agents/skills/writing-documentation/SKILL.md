@@ -40,7 +40,7 @@ If none fits, stop and file a template issue for the missing place (step 1's rou
 
 - Every page carries `description:` (one sentence on what it's for; it's the page's line in `llms.txt`) and `kind:` (`tutorial`, `how-to`, `reference` or `explanation`, per the contract page's Sections table).
 
-- A feature that widens what the server can reach or change links to `guides/security-model.md`, and the security model's domain block says what the feature adds.
+- A feature that widens what the server can reach or change links to `security-model.md`, and the security model's domain block says what the feature adds.
 - A page that needs another topic links to that topic's page instead of summarising it.
 
 ## 5. Examples a reader will paste
