@@ -37,7 +37,8 @@ Template script parks, implementation agent sorts:
   is resolved to the template's side, since ``gen_reference.py`` rewrites it.
 
 Idempotent: a block already carried, a page already restored, is left alone;
-a project whose HEAD has no old page is a no-op.
+a project whose HEAD has no old page is a no-op.  A finding that comes with
+no action (a blockless old page) is reported on every run.
 """
 
 from __future__ import annotations

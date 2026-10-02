@@ -427,7 +427,13 @@ def test_blockless_old_page_is_noted_not_parked(tmp_path: Path) -> None:
     assert any(
         "had no DOMAIN blocks" in n and "docs/deployment/oidc.md" in n for n in notes
     )
-    assert migrate(root) == []
+    new_page = root / "docs" / "deploy" / "oidc.md"
+    new_text = new_page.read_text(encoding="utf-8")
+    again = migrate(root)
+    assert new_page.read_text(encoding="utf-8") == new_text
+    assert again == [n for n in notes if "had no DOMAIN blocks" in n], (
+        "a finding with no action to take recurs on every run; nothing else does"
+    )
 
 
 def test_links_to_a_switched_off_page_are_not_retargeted(tmp_path: Path) -> None:
