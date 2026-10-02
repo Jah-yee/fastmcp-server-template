@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from check_docs_structure import collect, main
 
 GOOD_FRONT = '---\ndescription: "A page."\nkind: how-to\n---\n\n'
-SEC = "See the [security model](guides/security-model.md).\n"
+SEC = "See the [security model](security-model.md).\n"
 
 MKDOCS = """site_name: t
 exclude_docs: |
@@ -19,7 +19,7 @@ exclude_docs: |
 
 nav:
   - Overview: index.md
-  - Security model: guides/security-model.md
+  - Security model: security-model.md
   - Use:
       - Overview: use/index.md
       # PROJECT-NAV-USE-START — x
@@ -39,11 +39,11 @@ def _repo(tmp_path: Path, unsorted: str = "", strict: bool = False) -> Path:
         encoding="utf-8",
     )
     _page(tmp_path, "index.md", GOOD_FRONT + "# Home\n" + SEC)
-    _page(tmp_path, "guides/security-model.md", GOOD_FRONT + "# Security\n")
+    _page(tmp_path, "security-model.md", GOOD_FRONT + "# Security\n")
     _page(
         tmp_path,
         "use/index.md",
-        GOOD_FRONT + "# Use\n" + SEC.replace("guides/", "../guides/"),
+        GOOD_FRONT + "# Use\n" + SEC.replace("](security", "](../security"),
     )
     return tmp_path
 
@@ -109,12 +109,12 @@ def test_e3_counts_only_a_real_link(tmp_path: Path) -> None:
     _page(root, "index.md", GOOD_FRONT + "# Home\n```\nsecurity-model.md\n```\n")
     _page(
         root,
-        "deployment/docker.md",
-        GOOD_FRONT + "# Docker\n" + SEC.replace("guides/", "../guides/"),
+        "deploy/docker.md",
+        GOOD_FRONT + "# Docker\n" + SEC.replace("](security", "](../security"),
     )
     codes = _codes(root)
     assert ("E3", "docs/index.md") in codes
-    assert ("E3", "docs/deployment/docker.md") not in codes
+    assert ("E3", "docs/deploy/docker.md") not in codes
 
 
 def test_exclude_docs_bare_name_matches_any_component(tmp_path: Path) -> None:
@@ -194,3 +194,13 @@ def test_w4_python_block_without_a_tag(tmp_path: Path) -> None:
         ("docs/use/x.md", 7),
         ("docs/use/y.md", 7),
     ]
+
+
+def test_e3_readme_must_link_the_security_model(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    (root / "README.md").write_text("# R\n\nNo link.\n", encoding="utf-8")
+    assert ("E3", "README.md") in _codes(root)
+    (root / "README.md").write_text(
+        "# R\n\nSee the [model](docs/security-model.md#scope).\n", encoding="utf-8"
+    )
+    assert ("E3", "README.md") not in _codes(root)

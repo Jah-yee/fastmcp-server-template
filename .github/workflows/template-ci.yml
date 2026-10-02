@@ -112,8 +112,8 @@ jobs:
         # above: enable_structural_gate toggles nothing under docs/ or
         # README.md, so that variant's prose is byte-identical to /tmp/smoke.
         # enable_authorization is the flag that matters — off, it drops
-        # docs/guides/authorization.md entirely and changes both README.md and
-        # docs/guides/authentication.md, so its prose is a branch no other step
+        # docs/deploy/authorization.md entirely and changes both README.md and
+        # docs/deploy/authentication.md, so its prose is a branch no other step
         # sees.
         run: |
           rm -rf /tmp/smoke-authz-off
@@ -305,14 +305,23 @@ jobs:
           uv run --no-sync --no-build python scripts/check_docs_structure.py --strict
           .venv/bin/python scripts/check_docs_structure.py --strict --root /tmp/smoke-authz-off
 
-      - name: generated reference (the shipped pages equal a fresh generation)
+      - name: generated reference (the scaffold's own page equals a fresh generation)
         # scripts/gen_reference.py (#716) needs the installed project, so it
         # cannot run in copier's _tasks; the template ships the scaffold's
-        # pages and this step proves they are what the generator writes.
+        # pages. Pages for tools pvl-core registers (get_server_info) carry
+        # pvl-core's docstrings, which change with its releases, so equality
+        # is asserted only for the page the template owns (tools.md: ping);
+        # the rest is regenerated, then `--check` proves the generator is
+        # idempotent on what it just wrote.
         working-directory: /tmp/smoke
         run: |
-          uv run --no-sync --no-build python scripts/gen_reference.py --check
-          (cd /tmp/smoke-authz-off && /tmp/smoke/.venv/bin/python scripts/gen_reference.py --check)
+          for d in /tmp/smoke /tmp/smoke-authz-off; do
+            cp "$d/docs/reference/tools/tools.md" /tmp/tools-shipped.md
+            (cd "$d" && /tmp/smoke/.venv/bin/python scripts/gen_reference.py)
+            diff -u /tmp/tools-shipped.md "$d/docs/reference/tools/tools.md" \
+              || { echo "::error::$d: the shipped docs/reference/tools/tools.md differs from a fresh generation — regenerate the template's shipped page"; exit 1; }
+            (cd "$d" && /tmp/smoke/.venv/bin/python scripts/gen_reference.py --check)
+          done
 
       - name: ruff check
         working-directory: /tmp/smoke
@@ -404,7 +413,7 @@ jobs:
           ttend=$(grep -cE '^<!-- TEMPLATE-TRACKING-END -->$' AGENTS.md || true)
           [ "$ttstart" = "2" ] || { echo "::error::expected 2 TEMPLATE-TRACKING-START markers, found $ttstart"; exit 1; }
           [ "$ttend" = "2" ] || { echo "::error::expected 2 TEMPLATE-TRACKING-END markers, found $ttend"; exit 1; }
-          rp=$(grep -cE '^<!-- TEMPLATE-TRACKING-START -->$' docs/deployment/release-process.md || true)
+          rp=$(grep -cE '^<!-- TEMPLATE-TRACKING-START -->$' docs/contribute/release-process.md || true)
           [ "$rp" = "1" ] || { echo "::error::expected 1 TEMPLATE-TRACKING pair in release-process.md, found $rp"; exit 1; }
           rel=$(grep -cE '^<!-- TEMPLATE-TRACKING-START -->$' .agents/skills/releasing/SKILL.md || true)
           [ "$rel" = "1" ] || { echo "::error::expected 1 TEMPLATE-TRACKING pair in releasing skill, found $rel"; exit 1; }
@@ -427,25 +436,25 @@ jobs:
           # rendered tokens like SMOKE_MCP_SERVER_NAME don't false-positive
           # as MCP_SERVER_ leaks (substring collision).
           for f in \
-              docs/deployment/oidc.md \
-              docs/deployment/docker.md \
-              docs/guides/authentication.md; do
+              docs/deploy/oidc.md \
+              docs/deploy/docker.md \
+              docs/deploy/authentication.md; do
             grep -qE 'SMOKE_MCP_[A-Z][A-Z0-9_]*' "$f" \
               || { echo "::error::$f missing any SMOKE_MCP_ env var — substitution did not occur"; exit 1; }
           done
           ! grep -lE '(^|[^A-Z0-9_])MCP_SERVER_' \
-              docs/deployment/docker.md \
-              docs/deployment/oidc.md \
-              docs/guides/authentication.md \
+              docs/deploy/docker.md \
+              docs/deploy/oidc.md \
+              docs/deploy/authentication.md \
             || { echo "::error::MCP_SERVER_ placeholder literal leaked into shared docs"; exit 1; }
           ! grep -lF fastmcp-server-template \
-              docs/deployment/docker.md \
-              docs/deployment/oidc.md \
-              docs/guides/authentication.md \
+              docs/deploy/docker.md \
+              docs/deploy/oidc.md \
+              docs/deploy/authentication.md \
             || { echo "::error::fastmcp-server-template literal leaked into shared docs"; exit 1; }
 
       - name: OIDC generated env-var tables (markers, content, idempotence)
-        # docs/deployment/oidc.md's and docs/guides/authentication.md's OIDC
+        # docs/deploy/oidc.md's and docs/deploy/authentication.md's OIDC
         # env-var tables are generated from a single source of truth
         # (scripts/gen_config_surface.py), spliced between
         # GENERATED-ENV-TABLE-OIDC-{REQUIRED,OPTIONAL} markers — replacing
@@ -465,8 +474,8 @@ jobs:
         working-directory: /tmp/smoke
         run: |
           set -euo pipefail
-          OIDC=docs/deployment/oidc.md
-          AUTH=docs/guides/authentication.md
+          OIDC=docs/deploy/oidc.md
+          AUTH=docs/deploy/authentication.md
 
           # --- #260 regression guard, the load-bearing outcome: the
           # "ephemeral"/restart-invalidation wording that used
@@ -616,65 +625,33 @@ jobs:
           print(f"server.json validates against {schema_path}")
           PY
 
-      - name: README generated env-var tables (markers, content)
-        # README.md's "Configuration" and "Domain configuration" sections
-        # are spliced from the same scripts/gen_config_surface.py source of
-        # truth as the OIDC tables above, between GENERATED-ENV-TABLE-CORE
-        # and GENERATED-ENV-TABLE-DOMAIN markers — replacing two
-        # hand-maintained tables. Nothing in this file asserted anything
-        # about that generated content before this step.
+      - name: README generated env-var table (markers, content)
+        # README.md's "Configuration" section is spliced from the same
+        # scripts/gen_config_surface.py source of truth as the OIDC tables
+        # above, between GENERATED-ENV-TABLE-DOMAIN markers: the project's
+        # own `readme`-tagged fields. The shared (core) variables left the
+        # README for the generated reference (#717), so there is one region.
         #
-        # Idempotence of these regions is already covered by the OIDC
-        # step's `--check` just above: one generator writes every spliced
-        # file (README.md included), and one offline `--check` validates
-        # all of its output, so this step does not repeat that check —
-        # it only asserts markers and content.
+        # Idempotence of the region is already covered by the OIDC step's
+        # `--check` just above: one generator writes every spliced file
+        # (README.md included), and one offline `--check` validates all of
+        # its output, so this step does not repeat that check — it only
+        # asserts markers and content.
         working-directory: /tmp/smoke
         run: |
           set -euo pipefail
           README=README.md
 
-          region() {  # region <CORE|DOMAIN>
+          region() {  # region <DOMAIN>
             sed -n "/GENERATED-ENV-TABLE-$1-START/,/GENERATED-ENV-TABLE-$1-END/p" "$README"
           }
 
-          # --- markers present for both regions.
-          for kind in CORE DOMAIN; do
-            grep -qF "GENERATED-ENV-TABLE-$kind-START" "$README" \
-              || { echo "::error::$README missing GENERATED-ENV-TABLE-$kind-START marker"; exit 1; }
-            grep -qF "GENERATED-ENV-TABLE-$kind-END" "$README" \
-              || { echo "::error::$README missing GENERATED-ENV-TABLE-$kind-END marker"; exit 1; }
-          done
-
-          # --- CORE region: exactly the three shared pvl-core vars, each
-          # paired with its expected Default cell — an added, dropped, or
-          # renamed CORE var, or a changed default, fails this step.
-          # `|| true` guards the command substitutions against `set -e`: a
-          # zero-match grep under `-c`/no-match `grep -F` still exits 1,
-          # which would abort the step here rather than let the checks
-          # below report it with context (same guard shape the OIDC step
-          # above uses).
-          kv_row=$(region CORE | grep -F '`SMOKE_MCP_KV_STORE_URL`') \
-            || { echo "::error::$README CORE region missing the SMOKE_MCP_KV_STORE_URL row"; exit 1; }
-          echo "$kv_row" | grep -qF '| `file:///data/state` |' \
-            || { echo "::error::$README KV_STORE_URL row does not show Default \`file:///data/state\`: $kv_row"; exit 1; }
-
-          log_row=$(region CORE | grep -F '`SMOKE_MCP_LOG_LEVEL`') \
-            || { echo "::error::$README CORE region missing the SMOKE_MCP_LOG_LEVEL row"; exit 1; }
-          echo "$log_row" | grep -qF '| `INFO` |' \
-            || { echo "::error::$README LOG_LEVEL row does not show Default \`INFO\`: $log_row"; exit 1; }
-
-          # No default: unset means auto (rich on a terminal, json elsewhere),
-          # which is not a value an operator writes, so the cell is the
-          # generator's `(none)` placeholder and the help text says the rest.
-          format_row=$(region CORE | grep -F '`SMOKE_MCP_LOG_FORMAT`') \
-            || { echo "::error::$README CORE region missing the SMOKE_MCP_LOG_FORMAT row"; exit 1; }
-          echo "$format_row" | grep -qF '| (none) |' \
-            || { echo "::error::$README LOG_FORMAT row does not show Default (none): $format_row"; exit 1; }
-
-          core_rows=$(region CORE | grep -cE '^\| `' || true)
-          [ "$core_rows" -eq 3 ] \
-            || { echo "::error::$README CORE region has $core_rows data rows, expected exactly 3"; exit 1; }
+          grep -qF "GENERATED-ENV-TABLE-DOMAIN-START" "$README" \
+            || { echo "::error::$README missing GENERATED-ENV-TABLE-DOMAIN-START marker"; exit 1; }
+          grep -qF "GENERATED-ENV-TABLE-DOMAIN-END" "$README" \
+            || { echo "::error::$README missing GENERATED-ENV-TABLE-DOMAIN-END marker"; exit 1; }
+          ! grep -qF "GENERATED-ENV-TABLE-CORE" "$README" \
+            || { echo "::error::$README still carries the CORE region the generated reference replaced (#717)"; exit 1; }
 
           # --- DOMAIN region: a curated `readme`-tagged subset since the
           # generated-reference rework. The smoke render has no domain
@@ -1465,15 +1442,16 @@ jobs:
                 .github/workflows/claude-code-review.yml
           rm -f scripts/copier_update_notes.py
           rm -f scripts/migrate_agent_instructions.py
-          rm -f scripts/migrate_docs_nav.py scripts/migrate_docs_reference.py
+          rm -f scripts/migrate_docs_nav.py scripts/migrate_docs_pages.py
           rm -f scripts/report_seeded_changes.py .copier-seeded-changes.md
           rm -f scripts/check_template_conformance.py .copier-template-drift.md
           sed -i.bak '/# >>> template-tracking: conformance hook/,/# <<< template-tracking: conformance hook/d' .pre-commit-config.yaml && rm -f .pre-commit-config.yaml.bak
           ! grep -q 'check_template_conformance' .pre-commit-config.yaml \
             || { echo "::error::detach left the template-conformance hook in .pre-commit-config.yaml"; exit 1; }
           rm -rf .agents/skills/applying-template-updates .claude/skills/applying-template-updates
-          rm -f docs/deployment/template-updates.md
-          sed -i.bak '/deployment\/template-updates.md/d' mkdocs.yml && rm -f mkdocs.yml.bak
+          rm -f docs/contribute/template-updates.md
+          sed -i.bak '/contribute\/template-updates.md/d' mkdocs.yml && rm -f mkdocs.yml.bak
+          sed -i.bak '/template-updates.md/d' docs/contribute/index.md && rm -f docs/contribute/index.md.bak
           # --- Step 3 PREFLIGHT: every scrub anchor must exist, at the exact
           #     count the scrub expects (issue #199).
           #
@@ -1525,7 +1503,7 @@ jobs:
           # in this set: its copier-update wording matches none of the sed
           # rules below, so scrubbing it here would be a no-op that still
           # needs a real fix — tracked as a follow-up issue instead.
-          SCRUB_FILES="AGENTS.md .agents/skills/releasing/SKILL.md .agents/skills/config-contract/SKILL.md .agents/skills/tool-registration/SKILL.md docs/deployment/release-process.md"
+          SCRUB_FILES="AGENTS.md .agents/skills/releasing/SKILL.md .agents/skills/config-contract/SKILL.md .agents/skills/tool-registration/SKILL.md docs/contribute/release-process.md"
           count_occurrences() {
             cat $SCRUB_FILES | grep -oF "$1" | wc -l | tr -d '[:space:]' || true
           }
@@ -1618,11 +1596,11 @@ jobs:
             && { echo "::error::automatic-review tracking guidance survived the scrub"; exit 1; } || true
           grep -qE '^## Release notes pages$' .agents/skills/releasing/SKILL.md \
             && { echo "::error::Release notes pages section survived the scrub"; exit 1; } || true
-          grep -qE '^## Template updates$' docs/deployment/release-process.md \
+          grep -qE '^## Template updates$' docs/contribute/release-process.md \
             && { echo "::error::Template updates section survived the scrub"; exit 1; } || true
-          grep -qE '^## Where to read about a release$' docs/deployment/release-process.md \
+          grep -qE '^## Where to read about a release$' docs/contribute/release-process.md \
             || { echo "::error::release-process page lost '## Where to read about a release' — scrub deleted too much"; exit 1; }
-          [ ! -e docs/deployment/template-updates.md ] \
+          [ ! -e docs/contribute/template-updates.md ] \
             || { echo "::error::template-updates page not removed by detach"; exit 1; }
           [ ! -e .claude/skills/applying-template-updates ] \
             || { echo "::error::applying-template-updates symlink not removed by detach"; exit 1; }
@@ -1640,6 +1618,8 @@ jobs:
           # [project.scripts] in pyproject.toml).
           uv run --no-sync --no-build python scripts/gen_reference.py --check \
             || { echo "::error::gen_reference.py --check fails on the detached tree"; exit 1; }
+          uv run --no-sync --no-build python scripts/check_docs_structure.py --strict \
+            || { echo "::error::the detached docs fail the structure check; a scrub left a dangling link"; exit 1; }
           # The releasing skill's own TEMPLATE-TRACKING pair (pair 2) has no
           # over-run guard from the AGENTS.md kept-section loop below, since
           # that loop only ever checks AGENTS.md. Guard it here instead: the
@@ -2089,7 +2069,7 @@ jobs:
         run: |
           uv run --no-sync --no-build ruff check \
             --select C901,PLR0911,PLR0912,PLR0913,PLR0915,S \
-            --per-file-ignores "scripts/gen_config_surface.py:S606,scripts/promote_release_notes.py:S603,scripts/promote_release_notes.py:S607,scripts/check_pins.py:S310,scripts/report_seeded_changes.py:S603,scripts/report_seeded_changes.py:S606,scripts/report_seeded_changes.py:S607,scripts/check_template_conformance.py:S603,scripts/check_template_conformance.py:S607,scripts/package_milestones.py:S603,scripts/package_milestones.py:S607,scripts/migrate_agent_instructions.py:S603,scripts/migrate_agent_instructions.py:S607,scripts/migrate_docs_nav.py:S603,scripts/migrate_docs_nav.py:S607,scripts/migrate_docs_reference.py:S603,scripts/migrate_docs_reference.py:S607" \
+            --per-file-ignores "scripts/gen_config_surface.py:S606,scripts/promote_release_notes.py:S603,scripts/promote_release_notes.py:S607,scripts/check_pins.py:S310,scripts/report_seeded_changes.py:S603,scripts/report_seeded_changes.py:S606,scripts/report_seeded_changes.py:S607,scripts/check_template_conformance.py:S603,scripts/check_template_conformance.py:S607,scripts/package_milestones.py:S603,scripts/package_milestones.py:S607,scripts/migrate_agent_instructions.py:S603,scripts/migrate_agent_instructions.py:S607,scripts/migrate_docs_nav.py:S603,scripts/migrate_docs_nav.py:S607,scripts/migrate_docs_pages.py:S603,scripts/migrate_docs_pages.py:S607" \
             --config "lint.mccabe.max-complexity=10" \
             --config "lint.pylint.max-args=5" \
             --config "lint.pylint.max-branches=12" \
@@ -2097,7 +2077,7 @@ jobs:
             --config "lint.pylint.max-statements=50" \
             --line-length 88 \
             --target-version py311 \
-            scripts/gen_config_surface.py scripts/copier_update_notes.py scripts/promote_release_notes.py scripts/check_pins.py scripts/check_references.py scripts/report_seeded_changes.py scripts/check_template_conformance.py scripts/package_milestones.py scripts/migrate_agent_instructions.py scripts/migrate_docs_nav.py scripts/llmstxt_sections_hook.py scripts/check_docs_structure.py scripts/gen_reference.py scripts/migrate_docs_reference.py scripts/published_examples.py scripts/check_pr_title.py scripts/repo_about.py
+            scripts/gen_config_surface.py scripts/copier_update_notes.py scripts/promote_release_notes.py scripts/check_pins.py scripts/check_references.py scripts/report_seeded_changes.py scripts/check_template_conformance.py scripts/package_milestones.py scripts/migrate_agent_instructions.py scripts/migrate_docs_nav.py scripts/llmstxt_sections_hook.py scripts/check_docs_structure.py scripts/gen_reference.py scripts/migrate_docs_pages.py scripts/published_examples.py scripts/check_pr_title.py scripts/repo_about.py
 
   sonar:
     # CI-based SonarQube Cloud analysis of this repository, with the coverage

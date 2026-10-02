@@ -57,6 +57,15 @@ _tasks:
 # fields.  Migrations never run on `copier copy`; the `_tasks` entry above
 # covers that path.
 _migrations:
+  # Documentation moves (#716, #717): the template renders pages at new
+  # paths and the update deletes the old ones.  Carries every DOMAIN block
+  # of a moved page (read from HEAD) into the new page, maps the README's
+  # positional blocks onto the named ones, and restores a tools or prompts
+  # page that held project content as a parked page for the agent applying
+  # the update to sort into the generated pages' slots.  Idempotent.  Runs
+  # before the config generator, which cannot splice a README that still
+  # carries the update's conflict markers.
+  - "python scripts/migrate_docs_pages.py"
   - "python scripts/gen_config_surface.py"
   # Real-directory -> symlink guard for .claude/skills/ (#484/#485/#486).
   # Any downstream still on a pre-move release has REAL directories at
@@ -103,14 +112,6 @@ _migrations:
   # own entries (read from HEAD:mkdocs.yml) under Unsorted for the agent
   # applying the update to sort.  Idempotent; a no-op once HEAD carries the frame.
   - "python scripts/migrate_docs_nav.py"
-  # Reference move (#716): the template stopped rendering docs/configuration.md,
-  # docs/configuration-generator.md, docs/tools/index.md and docs/prompts.md,
-  # so the update deletes them.  Carries the DOMAIN blocks of the old
-  # configuration page (from HEAD) into docs/reference/configuration.md and
-  # restores a tools or prompts page that held project content as a parked
-  # page for the agent applying the update to sort into the generated pages'
-  # slots.  Idempotent.
-  - "python scripts/migrate_docs_reference.py"
   # Seeded-file change report (#519): renders the previous and target refs
   # and diffs every `_skip_if_exists` path into .copier-seeded-changes.md,
   # so an update is never applied blind to what it cannot re-render.  From

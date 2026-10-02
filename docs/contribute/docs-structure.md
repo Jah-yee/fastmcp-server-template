@@ -33,7 +33,7 @@ The site is organised by what its reader is trying to do. The template owns this
 | Upgrade | an operator moving to a new release | how-to |
 | Contribute | someone changing the project | how-to or explanation |
 
-Moving a template page between sections is a template change, and the page keeps its file path and URL when it moves.
+Each section's template pages live in that section's directory (`get-started/`, `deploy/`, `use/`, `reference/`, `upgrade/`, `contribute/`; the Overview and the security model at the top). Moving a template page is a template change, and the template's redirects keep its old URL working.
 
 ## Front matter and llms.txt
 
@@ -54,6 +54,7 @@ kind: how-to
 |---|---|---|
 | A template page, outside its sentinel blocks | template | non-domain knowledge only |
 | A `DOMAIN-<TOPIC>-<KIND>` block inside a template page (such as the Docker page's extra-notes block) | this project | only what this server adds to that non-domain topic |
+| The `DOMAIN-README-*` blocks of `README.md` (badges, pitch, fit, extras, design decisions) | this project | the front door's project-specific text; everything else on the README is the template's frame |
 | A generated region (`GENERATED-*` markers, such as the configuration tables) | the generator | facts drawn from the code; change the source, never the page |
 | A generated page under `docs/reference/` (it starts with the generator's marker comment) | `scripts/gen_reference.py` | tools, resources, prompts and the command line, read from the code; prose only in its `DOMAIN-INTRO` and `DOMAIN-EXAMPLE-<name>` slots |
 | `docs/use/` | this project; the template renders only its `index.md` | this server's how-tos and explanations |
@@ -113,6 +114,6 @@ The check reads `exclude_docs` in the forms this file uses: `dir/**`, a plain gl
 
 ## The security model
 
-The [security model](../guides/security-model.md) is the one page that says what the server can reach, what it changes and who gets in. When a page documents a feature that widens that surface, it links there rather than describing the boundary again.
+The [security model](../security-model.md) is the one page that says what the server can reach, what it changes and who gets in. When a page documents a feature that widens that surface, it links there rather than describing the boundary again.
 
 Report a vulnerability as `SECURITY.md` describes, never in a public issue.

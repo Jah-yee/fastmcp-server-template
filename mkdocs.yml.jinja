@@ -67,6 +67,17 @@ plugins:
         configuration-generator.md: reference/configuration-generator.md
         tools/index.md: reference/tools/index.md
         prompts.md: reference/prompts.md
+        guides/security-model.md: security-model.md
+        installation.md: get-started/installation.md
+        deployment/claude-desktop.md: get-started/claude-desktop.md
+        deployment/docker.md: deploy/docker.md
+        guides/authentication.md: deploy/authentication.md
+        deployment/oidc.md: deploy/oidc.md
+{% if enable_authorization %}        guides/authorization.md: deploy/authorization.md
+{% endif %}        deployment/release-process.md: contribute/release-process.md
+        deployment/template-updates.md: contribute/template-updates.md
+        deployment/repository-protection.md: contribute/repository-protection.md
+        deployment/integration-branches.md: contribute/integration-branches.md
         # PROJECT-REDIRECTS-START — this project's moved pages; kept across copier update
         # PROJECT-REDIRECTS-END
   # Generates llms.txt + llms-full.txt for the README badge.
@@ -114,17 +125,19 @@ hooks:
 
 nav:
   - Overview: index.md
-  - Security model: guides/security-model.md
+  - Security model: security-model.md
   - Get started:
-      - Installation: installation.md
-      - Claude Desktop: deployment/claude-desktop.md
+      - Overview: get-started/index.md
+      - Installation: get-started/installation.md
+      - Claude Desktop: get-started/claude-desktop.md
       # PROJECT-NAV-GET-STARTED-START — this server's first-run pages; kept across copier update
       # PROJECT-NAV-GET-STARTED-END
   - Deploy:
-      - Docker: deployment/docker.md
-      - Authentication: guides/authentication.md
-      - OIDC: deployment/oidc.md
-{% if enable_authorization %}      - Authorization: guides/authorization.md
+      - Overview: deploy/index.md
+      - Docker: deploy/docker.md
+      - Authentication: deploy/authentication.md
+      - OIDC: deploy/oidc.md
+{% if enable_authorization %}      - Authorization: deploy/authorization.md
 {% endif %}      # PROJECT-NAV-DEPLOY-START — this server's deployment additions; kept across copier update
       # PROJECT-NAV-DEPLOY-END
   - Use:
@@ -152,15 +165,17 @@ nav:
   # release never needs a nav edit (mkdocs treats not-in-nav pages as INFO,
   # so `--strict` stays green); the landing page and search link them.
   - Upgrade:
+      - Overview: upgrade/index.md
       - Release notes: releases/index.md
       # PROJECT-NAV-UPGRADE-START — kept across copier update
       # PROJECT-NAV-UPGRADE-END
   - Contribute:
+      - Overview: contribute/index.md
       - Documentation structure: contribute/docs-structure.md
-      - Release process: deployment/release-process.md
-      - Template updates: deployment/template-updates.md
-      - Repository protection: deployment/repository-protection.md
-      - Integration branches: deployment/integration-branches.md
+      - Release process: contribute/release-process.md
+      - Template updates: contribute/template-updates.md
+      - Repository protection: contribute/repository-protection.md
+      - Integration branches: contribute/integration-branches.md
       # PROJECT-NAV-CONTRIBUTE-START — kept across copier update
       # PROJECT-NAV-CONTRIBUTE-END
   # PROJECT-NAV-UNSORTED-START — entries the nav migration could not place; move each into a section above
