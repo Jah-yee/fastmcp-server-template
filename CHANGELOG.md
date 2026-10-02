@@ -1,5 +1,18 @@
 # Changelog
 
+## v11.1.0 (2026-10-02)
+
+- #733 chore(deps): update anthropics/claude-code-action digest to 97c5347
+- #732 chore(deps): update dependency sonarsource/sonarqube-scan-action to v8.3.0
+- #730 chore(deps): update anthropics/claude-code-action digest to fd1c128
+- #729 chore(deps): update dependency renovatebot/github-action to v46.3.6
+- #724 feat(docs): reader-shaped documentation structure
+- #721 chore(deps): update anthropics/claude-code-action digest to 8ce9314
+- #720 fix(docs): state OIDC admission in the security model; drop the stale compose copy
+- #719 feat(docs): documentation structure contract and writing-documentation skill
+- #537 docs(specs): record the template/pvl-core one-repo decision
+
+
 ## v11.0.2 (2026-09-28)
 
 - #707 fix: wrap the identity call; build task-backend test configs from the environment

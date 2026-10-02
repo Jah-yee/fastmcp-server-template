@@ -302,105 +302,10 @@ Steps: [upgrading/v10.3.md](upgrading/v10.3.md).
 
 Steps: [upgrading/v11.0.md](upgrading/v11.0.md).
 
-## Unreleased - documentation structure contract
+## v11.1 - documentation structure contract
 
-### Documentation structure contract and `writing-documentation` skill
+Steps: [upgrading/v11.1.md](upgrading/v11.1.md).
 
-`copier update` adds `docs/contribute/docs-structure.md` and the `writing-documentation` skill. Your `nav:` and `llmstxt` sections are project-owned, so the new page isn't linked until you add it:
+## Unreleased
 
-1. In `mkdocs.yml`, inside `PROJECT-NAV-START/END`, add a last section:
-   `- Contribute:` with `- Documentation structure: contribute/docs-structure.md`.
-2. Inside `PROJECT-LLMSTXT-SECTIONS-START/END`, add `Contribute:` with `- contribute/*.md`.
-
-The page states which documentation belongs to your project and which to the template. Pages it classifies as misplaced aren't moved by this update.
-
-### Sections in the docs navigation
-
-The template now owns the frame of `nav:` in `mkdocs.yml`: eight sections by what the reader is trying to do (Overview, Security model, Get started, Deploy, Use, Reference, Upgrade, Contribute), with a slot in each for your own pages. Template pages keep their file paths, so no URL changes.
-
-`copier update` rebuilds `nav:` on the new frame. Every entry you had added to your old navigation is moved under **Unsorted** at the end of `nav:`, keeping its section title; entries for template pages are dropped, because the frame lists them, and so is any title you had given a template page (the frame titles its own pages). When the migration can't do this safely, it leaves copier's conflict in place and prints why. Then:
-
-1. Move each entry under Unsorted into the `PROJECT-NAV-<SECTION>-START/END` block of the section whose reader it serves. `docs/contribute/docs-structure.md` lists the sections and what goes where; your own how-to and feature pages belong in Use (`docs/use/`).
-2. Delete the emptied `Guides:`-style headings left under Unsorted, and run `uv run mkdocs build --strict`.
-3. `git add mkdocs.yml`: the update leaves it marked as conflicted even though its content is resolved.
-
-`mkdocs-redirects` joins the docs dependency group. Run `uv lock` and commit `uv.lock`: the docs workflow installs from the lock (`uv sync --frozen`), so the docs build fails until the lock has it. If you move one of your own pages while sorting, add an `old.md: new.md` entry to the new `redirects` block in `mkdocs.yml` so its published URL keeps working.
-
-### llms.txt built from the navigation
-
-`llms.txt` is now generated from `nav:` when the site builds, by `scripts/llmstxt_sections_hook.py`. The `PROJECT-LLMSTXT-SECTIONS` block in `mkdocs.yml` is gone: `copier update` resolves the conflict it leaves to the template side, and the entries and descriptions you kept there are dropped.
-
-The hook is registered under a new top-level `hooks:` key in `mkdocs.yml`. If you already have a `hooks:` list, copier leaves a conflict there: keep your entries and add `scripts/llmstxt_sections_hook.py` to them.
-
-Each page's line in `llms.txt` now comes from its own front matter. Add to every page you own:
-
-```yaml
----
-description: "One sentence on what the page is for."
-kind: how-to
----
-```
-
-`kind` is `tutorial`, `how-to`, `reference` or `explanation`; `docs/contribute/docs-structure.md` says which fits each section. A page without `description:` is listed without one.
-
-### Documentation structure check
-
-`scripts/check_docs_structure.py` now runs in pre-commit and in the docs workflow. Errors fail from the first run: links to pages the site doesn't serve (`exclude_docs` drops them, or they sit outside `docs/`), published pages neither the nav nor `llms.txt` reaches, and a template entry page without its security-model link. Fix those before merging the update. Warnings (pages outside the designated places, missing `description:`/`kind:` front matter, entries under Unsorted) print without failing. Once they're gone, set `strict = true` under `[tool.docs-structure]` in `pyproject.toml` so new debt fails too.
-
-### Reference generated from the code
-
-The Reference section moved under `docs/reference/`, and its tool, resource, prompt and command-line pages are now written by `scripts/gen_reference.py` from what the server registers; the template's redirects keep the old URLs working. The update deletes `docs/configuration.md`, `docs/configuration-generator.md`, `docs/tools/index.md` and `docs/prompts.md`; `scripts/migrate_docs_pages.py` carries the `DOMAIN-CONFIG-VARS` block of the old configuration page into `docs/reference/configuration.md`, and restores a tools or prompts page that held this project's own text as a parked page. The update is finished only when these steps are done:
-
-1. Run `uv run python scripts/gen_reference.py`. It writes `docs/reference/` from the code and fills the `GENERATED-NAV-TOOLS` region of `nav:`. Pre-commit and CI fail while a page is stale.
-2. Tools group by the module that registers them. Where that is not the right page, add a `group:<slug>` tag (`tags={"group:reading"}`) to the tool and regenerate.
-3. Move every example from the parked `docs/tools/index.md` and `docs/prompts.md` into the `DOMAIN-EXAMPLE-<name>` slot of its tool or prompt, and every piece of task guidance into a page under `docs/use/`; then delete the parked page. `scripts/check_docs_structure.py` reports E2 on a parked page until it is gone, and its old URL shows the parked page instead of the redirect.
-4. `Returns:` and `Raises:` sections of tool docstrings are published now, so Vale lints them; fix the docstring, never the page. Identifiers in docstring prose render as code.
-5. A project whose `from_env` requires variables the scaffold does not sets them under `[tool.docs-reference] env` in `pyproject.toml` (the `PROJECT-DOCS-CHECKS` block), so the generator can build the server.
-
-### Every section in its own directory; the README is a front door
-
-The remaining template pages moved into their section's directory: `security-model.md` at the top level; `get-started/installation.md` and `get-started/claude-desktop.md`; `deploy/docker.md`, `deploy/authentication.md`, `deploy/oidc.md` and `deploy/authorization.md`; `contribute/release-process.md`, `contribute/template-updates.md`, `contribute/repository-protection.md` and `contribute/integration-branches.md`. Each section has an index page (`get-started/`, `deploy/`, `upgrade/`, `contribute/`), and the template's redirects keep every old URL working. `scripts/migrate_docs_pages.py` carries the `DOMAIN-*` block of each moved page from `HEAD` into the new page; a block with no home parks the old page in place and says so.
-
-`README.md` is a front door now: pitch, fit, one quick start per client, extras, the project's own configuration table, links into the sections, design decisions. Its five positional `DOMAIN-START`/`DOMAIN-END` blocks became named blocks (`DOMAIN-README-BADGES`, `-PITCH`, `-FIT`, `-EXTRAS`, `-DESIGN`); the migration maps the old blocks onto them by position, skipping a block that still held the scaffold's placeholder. Read the README once after the update: move a block that landed under the wrong heading, and give the fit block its one line on what the server reaches. What left the README lives elsewhere: release channels on `upgrade/index.md`; the shared variables table in the generated reference (`GENERATED-ENV-TABLE-CORE` is gone, and a project that tagged a shared variable `readme` has nothing to change, since only domain fields render in the README); the post-scaffold checklist, GitHub secrets, local development and scaffold troubleshooting on `contribute/index.md`.
-
-### Get started per client
-
-The Get started section gains two template pages, `get-started/claude-code.md` (the plugin when the project ships one, `claude mcp add` otherwise, a deployed server) and `get-started/http-client.md` (connecting claude.ai, Claude Code or another client to a server that runs elsewhere), each with a block for this project's own text: `DOMAIN-CLAUDE-CODE-FIRST-TASK` and `DOMAIN-HTTP-CLIENT-EXTRA`. `get-started/installation.md` is now the page that lists every install channel (the uv command, the `.mcpb` bundle, the plugin, the Docker image, the Linux packages, source) and how to check what was installed; `get-started/claude-desktop.md` is a tutorial whose first call is the read-only `get_server_info`. The nav frame lists the new pages; nothing moves and no URL changes.
-
-After the update:
-
-1. Fill the two new blocks: the first task to give Claude Code with this server, and what a remote client should know first. Read-only where the server has such a mode.
-2. The `DOMAIN-CLAUDE-DESKTOP` block now sits in the tutorial's step 2, under "What this server needs", before the restart step. Its content was kept; make it show the entry with the setting(s) this server needs to start and a read-only first configuration, and name the first task Claude can do with it. A `{ .config data-expect="field=literal" }` tag on that JSON makes `tests/test_published_examples.py` check the claim.
-3. The template's own JSON on the Claude Desktop page carries that tag too, with `env` empty, so the test builds `ProjectConfig` from the project's `config_contract_env` fixture alone; a project that passes `tests/test_config_contract.py` already supplies what that needs.
-4. A project with its own Claude Desktop or Claude Code guide moves the domain parts into these blocks and the rest nowhere (the template page covers it), then deletes the guide and adds a `redirects` entry for its URL.
-5. The `mcpb` command-line tool has no `install` command, and `/plugin install` has no `--global` flag (the panel asks for a scope). A page that copied either from an earlier README or guide drops it.
-
-### Deploy pages
-
-Three template pages join `docs/deploy/`: `systemd.md` (what the `.deb`/`.rpm` installs, the environment file, the unit's confinement, upgrades, a manual install), `oidc-providers.md` (Authelia, Keycloak, Google, GitHub through a broker, each with the mode it allows) and `reverse-proxy.md` (TLS and the public hostname, the Traefik override file, a path prefix and its routing). Each has a block for this project's text: `DOMAIN-SYSTEMD-EXTRA`, `DOMAIN-OIDC-PROVIDERS-EXTRA`, `DOMAIN-REVERSE-PROXY-EXTRA`. `oidc.md` now opens with the mode decision as a rule derived from the provider's and the clients' capabilities (signed access tokens and client registration for `remote`; `oidc-proxy` otherwise). Two sections moved: the Authelia walkthrough from `oidc.md` to the providers page, and the Docker page's `compose.override.yml` and the OIDC page's subpath routing to the reverse-proxy page; the old headings stay as one-line pointers, so inbound links keep resolving. The Known Limitations section of `authentication.md` reflects the current state of the upstream token-refresh issues (Claude Code refreshes a stored token; `offline_access` is still not requested by it; the Python SDK's SSE deadlock is open).
-
-After the update:
-
-1. Fill the three new blocks with what this server adds: data paths to open with `ReadWritePaths`, a claim or scope a provider must supply, a route the proxy must pass through.
-2. A project whose `DOMAIN-AUTH-EXTRA` or `DOMAIN-OIDC-EXTRA` block carries its own mode recommendation checks it against the rule on `oidc.md` and reduces it to what is specific to this server, or to a pointer.
-3. A project with its own systemd, Docker, or OIDC-provider guide moves the domain parts into the blocks and the rest nowhere (the template pages cover it), then deletes the guide and adds a `redirects` entry for its URL. A statement that `remote` mode "trusts the proxy's authentication" (a forward-auth proxy) is wrong in any guide that carries it: `remote` mode validates a signed token the client presents, and a forward-auth proxy gives the client no token.
-
-### Client guidance pages
-
-Two template pages join `docs/deploy/`: `transfer-links.md` (one-time download and upload URLs, for the person holding one and for the operator: the route outside authentication, the public URL, the store, the five `TRANSFER_*` variables) and, when `include_mcp_apps_scaffold` is on, `mcp-apps.md` (which clients render the interface, what a client without the extension gets, `APP_DOMAIN`). Their blocks: `DOMAIN-TRANSFER-EXTRA` (what a `ref` is for this server, which destinations an upload may name) and `DOMAIN-MCP-APPS-EXTRA` (what the app shows and which tool opens it).
-
-After the update:
-
-1. Fill the blocks. The transfer page and its nav entry are template-owned and always rendered; the page opens by saying this server has transfer links when the two tools appear in the tools reference, which covers a reader of a server without them. A project that wants the page gone files a template issue for a gate.
-2. A project with its own MCP Apps or transfer-links guide moves the domain parts into the blocks and the rest nowhere (the template pages cover it), then deletes the guide and adds a `redirects` entry. A derivation of the apps domain by hashing is that project's code, not the template's: the template page says only that `APP_DOMAIN` overrides the host derived from `BASE_URL`.
-3. `docs/reference/prompts.md` and `docs/reference/resources.md` gain a template-owned section each, "Running a prompt" and "Reading a resource", written by `scripts/gen_reference.py` between the `DOMAIN-INTRO` slot and the entries. Run `uv run python scripts/gen_reference.py` after the update; pre-commit and CI fail while the pages are stale. A project whose own pages explain how a client invokes a prompt replaces that text with a link to the prompts reference.
-
-### The Upgrade page and the release checklist
-
-`docs/upgrade/index.md` gains "The step for your channel" (one row per install channel, each linking the page that owns the command) and "What a release page tells you": the three fixed lines a release page's Upgrading section carries, **Clients**, **State** and **Security posture**, each with its "none" answer. The `writing-release-notes` skill now puts the Upgrading section directly after the summary, before the themes, and names those three lines in the page format; the next page written with `prepare-next` follows it. An existing release page is left as it is unless it is redrafted; the Upgrade page says that an older page answers the three questions in its Upgrading text instead. The Docker page gains "Upgrading the image" (`docker compose pull`, then `up -d`).
-
-`docs/releases/index.md` is seeded once, so the sentence the template added to its frame does not reach an existing project: add, after "each GitHub release links back to its page here.", the sentence "A page's Upgrading section answers three questions on fixed lines, **Clients**, **State** and **Security posture**; the [Upgrade](../upgrade/index.md) page says what each answers." The index entries carry no release date: `scripts/promote_release_notes.py` writes an entry at Release Prepare, before the tag exists, and the skill names tags and GitHub releases as the date authority.
-
-### Published examples are tested
-
-`tests/test_published_examples.py` (template-owned) checks the fenced blocks on every published page and `README.md`. From the first run it fails a shell block with an unquoted package extra (`pip install pkg[extra]`): quote it, `"pkg[extra]"`. Then tag the examples that make a claim: ```` ```python { .run data-expect="results" } ```` for a block a reader runs (add a `docs_example_substitutions` fixture to `tests/conftest.py` that maps placeholder paths to fixtures), ```` ```json { .config data-expect="read_only=True" } ```` for a configuration that claims something (a dotenv-shaped shell block takes the same tag), ```` ```python { .fragment } ```` for a snippet. A Python block with neither tag is W4 in the structure check: debt, failing only in strict mode. The tags render as CSS classes and attributes, invisible to readers.
+_Nothing yet._
