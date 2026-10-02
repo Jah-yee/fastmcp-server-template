@@ -282,7 +282,8 @@ def test_readme_conflict_is_resolved_to_the_new_frame_then_mapped(
     (root / "README.md").write_text(conflicted, encoding="utf-8")
     notes = migrate(root)
     readme = (root / "README.md").read_text(encoding="utf-8")
-    assert "<<<<<<<" not in readme and "GENERATED-ENV-TABLE-CORE" not in readme
+    assert "<<<<<<<" not in readme
+    assert "GENERATED-ENV-TABLE-CORE" not in readme
     assert "- **Search:** finds notes." in readme
     assert any("resolved README.md" in n for n in notes)
     assert migrate(root) == []

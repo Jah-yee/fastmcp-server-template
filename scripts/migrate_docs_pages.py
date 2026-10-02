@@ -87,7 +87,7 @@ _BLOCK = re.compile(
 )
 _BARE_BLOCK = re.compile(r"<!-- DOMAIN-START -->\n(.*?)<!-- DOMAIN-END -->", re.DOTALL)
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-_LINK = re.compile(r"(\]\(\s*<?)([^)\s>#?]+\.md)((?:[#?][^)\s>]*)?>?\s*\))")
+_LINK = re.compile(r"\]\(([^)\s]+)\)")
 # What the deleted pages' blocks held on a fresh render, comments stripped:
 # a block still saying this carries nothing the project wrote.
 _PLACEHOLDERS = frozenset(
@@ -299,12 +299,17 @@ def rewrite_links(text: str, page_rel: str) -> str:
     here = posixpath.dirname(page_rel)
 
     def fix(match: re.Match[str]) -> str:
-        target = match.group(2)
-        resolved = posixpath.normpath(posixpath.join(here, target))
+        target = match.group(1)
+        path, sep, rest = target.partition("#")
+        if not sep:
+            path, sep, rest = target.partition("?")
+        if not path.endswith(".md") or "://" in path:
+            return match.group(0)
+        resolved = posixpath.normpath(posixpath.join(here, path))
         if resolved not in moved:
             return match.group(0)
         new_target = posixpath.relpath(moved[resolved], here or ".")
-        return f"{match.group(1)}{new_target}{match.group(3)}"
+        return f"]({new_target}{sep}{rest})"
 
     out: list[str] = []
     fenced = False
@@ -318,13 +323,15 @@ def rewrite_links(text: str, page_rel: str) -> str:
 
 
 def _rewrite_project_links(root: Path, notes: list[str]) -> None:
-    docs = root / "docs"
+    docs = (root / "docs").resolve()
     if not docs.is_dir():
         return
     changed = []
-    for page in sorted(docs.rglob("*.md")):
-        rel = page.relative_to(docs).as_posix()
-        if rel.startswith(_HISTORY):
+    for rel in sorted(p.relative_to(docs).as_posix() for p in docs.rglob("*.md")):
+        if rel.startswith(_HISTORY) or ".." in rel.split("/"):
+            continue
+        page = (docs / rel).resolve()
+        if not page.is_relative_to(docs):
             continue
         text = page.read_text(encoding="utf-8")
         updated = rewrite_links(text, rel)
