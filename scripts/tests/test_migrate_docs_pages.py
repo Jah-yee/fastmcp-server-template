@@ -408,21 +408,24 @@ def test_switched_off_page_is_reported_not_swallowed(tmp_path: Path) -> None:
     )
 
 
-def test_rewritten_page_without_blocks_is_parked_not_lost(tmp_path: Path) -> None:
+def test_blockless_old_page_is_noted_not_parked(tmp_path: Path) -> None:
+    """A page without blocks may be a wholesale rewrite or an older template frame."""
     root = _repo(tmp_path)
     old = root / "docs" / "deployment" / "oidc.md"
-    old.write_text("# Our own OIDC page\n\nRewritten wholesale.\n", encoding="utf-8")
+    old.write_text(
+        "# OIDC\n\nAn older template frame, or our own rewrite.\n", encoding="utf-8"
+    )
     _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "rewritten")
+    _git(root, "commit", "-q", "-m", "blockless")
     old.unlink()
     (root / "docs" / "deploy" / "oidc.md").write_text(
         "# OIDC\n<!-- DOMAIN-OIDC-EXTRA-START -->\n<!-- hint -->\n<!-- DOMAIN-OIDC-EXTRA-END -->\n",
         encoding="utf-8",
     )
     notes = migrate(root)
-    assert old.exists(), "the rewritten page is parked in place"
+    assert not old.exists(), "a pristine older frame must not be parked"
     assert any(
-        "no DOMAIN blocks" in n and "docs/deployment/oidc.md" in n for n in notes
+        "had no DOMAIN blocks" in n and "docs/deployment/oidc.md" in n for n in notes
     )
     assert migrate(root) == []
 

@@ -30,8 +30,9 @@ Template script parks, implementation agent sorts:
   check does not report them; release notes, decision records and fenced
   code keep their old links, which the redirects serve. A move whose new
   page is not rendered for this project (a switched-off page) is not followed.
-- A page the project rewrote without the template's blocks is parked in
-  place, since nothing maps onto the new frame.
+- A page without ``DOMAIN-*`` blocks (rewritten by the project, or from a
+  template version that predates the block) carries nothing; the note says
+  where its text is, since the two cases cannot be told apart here.
 - The ``GENERATED-NAV-TOOLS`` region of ``mkdocs.yml``: a conflict inside it
   is resolved to the template's side, since ``gen_reference.py`` rewrites it.
 
@@ -278,13 +279,12 @@ def _carry(
             )
         return
     if not blocks(old):
-        # The project rewrote the page without the template's blocks; nothing
-        # maps onto the new frame, so the whole page is parked for sorting.
-        (root / old_rel).parent.mkdir(parents=True, exist_ok=True)
-        (root / old_rel).write_text(old, encoding="utf-8")
+        # Either the project rewrote the page without the template's blocks,
+        # or its template version predates the block: the two cannot be told
+        # apart here, so nothing is parked and the note says where the text is.
         notes.append(
-            f"parked {old_rel}: it has no DOMAIN blocks, so nothing could be carried "
-            f"into {new_rel}; move its text into that page's blocks, then delete it"
+            f"{old_rel} had no DOMAIN blocks, so nothing was carried into {new_rel}; "
+            f"if the page held your text, it is in `git show HEAD:{old_rel}`"
         )
         return
     current = new_path.read_text(encoding="utf-8")
@@ -445,7 +445,11 @@ def rebase_links(
 
 
 def rewrite_nav_paths(mkdocs_text: str, moved: dict[str, str] | None = None) -> str:
-    """Point ``nav:`` entries at the new path of a moved page."""
+    """Point ``nav:`` entries at the new path of a moved page.
+
+    Entries of the form ``- Title: path.md`` are covered; a quoted path or a
+    title containing a colon is left for the agent applying the update.
+    """
     table = _moved() if moved is None else moved
     out: list[str] = []
     in_nav = False
