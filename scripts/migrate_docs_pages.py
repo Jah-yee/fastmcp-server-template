@@ -38,6 +38,7 @@ a project whose HEAD has no old page is a no-op.
 
 from __future__ import annotations
 
+import os
 import posixpath
 import re
 import subprocess
@@ -82,9 +83,6 @@ _CONFLICT = re.compile(
     r"^=======\n(?P<after>.*?)^>>>>>>> after updating\n",
     re.DOTALL | re.MULTILINE,
 )
-_BLOCK = re.compile(
-    r"<!-- (DOMAIN-[A-Za-z0-9_.-]+?)-START[^>]*-->\n(.*?)<!-- \1-END -->", re.DOTALL
-)
 _BARE_BLOCK = re.compile(r"<!-- DOMAIN-START -->\n(.*?)<!-- DOMAIN-END -->", re.DOTALL)
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _LINK = re.compile(r"\]\(([^)\s]+)\)")
@@ -116,8 +114,36 @@ def _head(root: Path, rel: str) -> str | None:
 
 
 def blocks(text: str) -> dict[str, str]:
-    """Return ``DOMAIN-*`` block name -> body for *text* (named blocks only)."""
-    return dict(_BLOCK.findall(text))
+    """Return ``DOMAIN-*`` block name -> body for *text* (named blocks only).
+
+    A block opens on a line ``<!-- <NAME>-START ... -->`` and closes on the
+    first later line that is exactly ``<!-- <NAME>-END -->``; the body is
+    everything between, newline included.
+    """
+    found: dict[str, str] = {}
+    lines = text.splitlines(keepends=True)
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        i += 1
+        if not (
+            line.startswith("<!-- DOMAIN-")
+            and "-START" in line
+            and line.rstrip().endswith("-->")
+        ):
+            continue
+        name = line[len("<!-- ") : line.index("-START")]
+        if name == "DOMAIN":
+            continue  # a bare positional block; see positional_blocks
+        end = f"<!-- {name}-END -->"
+        body: list[str] = []
+        while i < len(lines) and lines[i].rstrip("\n") != end:
+            body.append(lines[i])
+            i += 1
+        if i < len(lines):
+            found[name] = "".join(body)
+            i += 1
+    return found
 
 
 def positional_blocks(text: str) -> list[str]:
@@ -328,15 +354,17 @@ def _rewrite_project_links(root: Path, notes: list[str]) -> None:
         return
     changed = []
     for rel in sorted(p.relative_to(docs).as_posix() for p in docs.rglob("*.md")):
-        if rel.startswith(_HISTORY) or ".." in rel.split("/"):
+        if rel.startswith(_HISTORY):
             continue
         page = (docs / rel).resolve()
-        if not page.is_relative_to(docs):
-            continue
-        text = page.read_text(encoding="utf-8")
+        if not str(page).startswith(str(docs) + os.sep):
+            continue  # a symlink pointing outside docs/ is not ours to rewrite
+        with page.open(encoding="utf-8") as handle:
+            text = handle.read()
         updated = rewrite_links(text, rel)
         if updated != text:
-            page.write_text(updated, encoding="utf-8")
+            with page.open("w", encoding="utf-8") as handle:
+                handle.write(updated)
             changed.append(f"docs/{rel}")
     if changed:
         notes.append(f"pointed links at moved pages on: {', '.join(changed)}")
