@@ -49,6 +49,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+DOCS = "docs/"  # every path in MOVES is repository-relative, under this
 # (old path, new path): the template renders the page at the new path now.
 MOVES = (
     ("docs/configuration.md", "docs/reference/configuration.md"),
@@ -335,7 +336,7 @@ _FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})", re.MULTILINE)
 
 
 def _moved() -> dict[str, str]:
-    return {old.removeprefix("docs/"): new.removeprefix("docs/") for old, new in MOVES}
+    return {old.removeprefix(DOCS): new.removeprefix(DOCS) for old, new in MOVES}
 
 
 def _retarget(target: str, from_dir: str, to_dir: str) -> str:
@@ -393,8 +394,8 @@ def rebase_links(body: str, old_rel: str, new_rel: str) -> str:
     Both paths are repository-relative (``docs/...``). A link to a moved page
     follows the move as well.
     """
-    from_dir = posixpath.dirname(old_rel.removeprefix("docs/"))
-    to_dir = posixpath.dirname(new_rel.removeprefix("docs/"))
+    from_dir = posixpath.dirname(old_rel.removeprefix(DOCS))
+    to_dir = posixpath.dirname(new_rel.removeprefix(DOCS))
     return _outside_fences(
         body,
         lambda line: _LINK.sub(
@@ -420,7 +421,7 @@ def _rewrite_project_links(root: Path, notes: list[str]) -> None:
         if updated != text:
             with page.open("w", encoding="utf-8") as handle:
                 handle.write(updated)
-            changed.append(f"docs/{rel}")
+            changed.append(f"{DOCS}{rel}")
     if changed:
         notes.append(f"pointed links at moved pages on: {', '.join(changed)}")
 
