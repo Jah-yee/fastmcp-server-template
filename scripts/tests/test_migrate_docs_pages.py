@@ -17,6 +17,7 @@ from migrate_docs_pages import (
     has_project_content,
     migrate,
     positional_blocks,
+    rebase_links,
     resolve_nav_region,
     rewrite_links,
     transplant,
@@ -332,3 +333,68 @@ def test_links_in_history_pages_and_fenced_code_are_left_alone(tmp_path: Path) -
     out = page.read_text(encoding="utf-8")
     assert "```markdown\n[m](../guides/security-model.md)\n```" in out
     assert "[n](../security-model.md)" in out
+
+
+def test_carried_links_are_rebased_across_a_depth_change() -> None:
+    body = (
+        "See [auth](guides/authentication.md#modes), [docker](deployment/docker.md), "
+        "[mine](use/mine.md) and [web](https://x.org/a.md).\n"
+        "```\n[code](guides/authentication.md)\n```\n"
+    )
+    out = rebase_links(body, "docs/installation.md", "docs/get-started/installation.md")
+    assert "[auth](../deploy/authentication.md#modes)" in out
+    assert "[docker](../deploy/docker.md)" in out
+    assert "[mine](../use/mine.md)" in out
+    assert "https://x.org/a.md" in out
+    assert "```\n[code](guides/authentication.md)\n```" in out
+    up = rebase_links(
+        "[d](../deployment/docker.md)",
+        "docs/guides/security-model.md",
+        "docs/security-model.md",
+    )
+    assert up == "[d](deploy/docker.md)"
+
+
+def test_migrate_rebases_links_in_carried_blocks(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    old = root / "docs" / "installation.md"
+    old.write_text(
+        "# I\n<!-- DOMAIN-INSTALL-EXTRA-START -->\nSee [auth](guides/authentication.md).\n"
+        "<!-- DOMAIN-INSTALL-EXTRA-END -->\n",
+        encoding="utf-8",
+    )
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "with installation page")
+    old.unlink()
+    (root / "docs" / "get-started").mkdir()
+    new = root / "docs" / "get-started" / "installation.md"
+    new.write_text(
+        "# I\n<!-- DOMAIN-INSTALL-EXTRA-START -->\n<!-- hint -->\n<!-- DOMAIN-INSTALL-EXTRA-END -->\n",
+        encoding="utf-8",
+    )
+    migrate(root)
+    assert "[auth](../deploy/authentication.md)" in new.read_text(encoding="utf-8")
+
+
+def test_fences_close_only_on_a_matching_marker() -> None:
+    text = "~~~\n```\n[a](../guides/security-model.md)\n~~~\n[b](../guides/security-model.md)\n"
+    out = rewrite_links(text, "deployment/x.md")
+    assert "[a](../guides/security-model.md)" in out
+    assert "[b](../security-model.md)" in out
+
+
+def test_switched_off_page_is_reported_not_swallowed(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    (root / "docs" / "guides").mkdir()
+    page = root / "docs" / "guides" / "authorization.md"
+    page.write_text(
+        "# A\n<!-- DOMAIN-AUTHZ-EXTRA-START -->\nours\n<!-- DOMAIN-AUTHZ-EXTRA-END -->\n",
+        encoding="utf-8",
+    )
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "authz")
+    page.unlink()
+    notes = migrate(root)
+    assert any(
+        "switched-off page" in n and "guides/authorization.md" in n for n in notes
+    )

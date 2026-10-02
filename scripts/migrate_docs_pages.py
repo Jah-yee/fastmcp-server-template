@@ -44,6 +44,10 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # (old path, new path): the template renders the page at the new path now.
 MOVES = (
@@ -178,11 +182,15 @@ def _replace_block(text: str, name: str, body: str) -> str:
     return text[:i] + body + text[j:]
 
 
-def transplant(old: str, new: str) -> tuple[str, list[str]]:
+def transplant(
+    old: str, new: str, old_rel: str | None = None, new_rel: str | None = None
+) -> tuple[str, list[str]]:
     """Copy each written ``DOMAIN-*`` block body of *old* into *new*.
 
-    Returns the updated *new* and the names of blocks *old* has that *new*
-    lacks, which cannot be carried automatically.
+    When the page's path changed (*old_rel* to *new_rel*), relative links in
+    a carried body are re-expressed from the new location. Returns the
+    updated *new* and the names of blocks *old* has that *new* lacks, which
+    cannot be carried automatically.
     """
     targets = blocks(new)
     missing = []
@@ -192,6 +200,8 @@ def transplant(old: str, new: str) -> tuple[str, list[str]]:
         if name not in targets:
             missing.append(name)
             continue
+        if old_rel and new_rel:
+            body = rebase_links(body, old_rel, new_rel)
         new = _replace_block(new, name, body)
     return new, missing
 
@@ -244,11 +254,19 @@ def resolve_nav_region(text: str) -> str:
 
 def _carry(root: Path, old_rel: str, new_rel: str, notes: list[str]) -> None:
     old = _head(root, old_rel)
+    if old is None or (root / old_rel).exists():
+        return
     new_path = root / new_rel
-    if old is None or not new_path.exists() or (root / old_rel).exists():
+    if not new_path.exists():
+        if has_project_content(old) and blocks(old):
+            notes.append(
+                f"{old_rel} held project content but the template renders no {new_rel} "
+                "for this project (a switched-off page); the text is in `git show "
+                f"HEAD:{old_rel}`"
+            )
         return
     current = new_path.read_text(encoding="utf-8")
-    updated, missing = transplant(old, current)
+    updated, missing = transplant(old, current, old_rel, new_rel)
     if updated != current:
         new_path.write_text(updated, encoding="utf-8")
         notes.append(f"carried the DOMAIN blocks of {old_rel} into {new_rel}")
@@ -316,36 +334,73 @@ _HISTORY = ("releases/", "decisions/", "design/", "superpowers/")
 _FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})", re.MULTILINE)
 
 
+def _moved() -> dict[str, str]:
+    return {old.removeprefix("docs/"): new.removeprefix("docs/") for old, new in MOVES}
+
+
+def _retarget(target: str, from_dir: str, to_dir: str) -> str:
+    """Resolve a relative ``.md`` link from *from_dir*, follow a move, and express it from *to_dir*."""
+    path, sep, rest = target.partition("#")
+    if not sep:
+        path, sep, rest = target.partition("?")
+    if not path.endswith(".md") or "://" in path or path.startswith("/"):
+        return target
+    resolved = posixpath.normpath(posixpath.join(from_dir, path))
+    resolved = _moved().get(resolved, resolved)
+    new_path = posixpath.relpath(resolved, to_dir or ".")
+    return f"{new_path}{sep}{rest}"
+
+
+def _outside_fences(text: str, transform: Callable[[str], str]) -> str:
+    """Apply *transform* to every line outside fenced code.
+
+    A fence closes only on a line whose marker uses the same character and is
+    at least as long as the opener's.
+    """
+    out: list[str] = []
+    fence: str | None = None
+    for line in text.splitlines(keepends=True):
+        match = _FENCE.match(line)
+        if match:
+            marker = match.group(1)
+            if fence is None:
+                fence = marker
+            elif marker[0] == fence[0] and len(marker) >= len(fence):
+                fence = None
+            out.append(line)
+            continue
+        out.append(line if fence else transform(line))
+    return "".join(out)
+
+
 def rewrite_links(text: str, page_rel: str) -> str:
     """Point links on *page_rel* (docs-relative) at the new path of a moved page.
 
     Fenced code is left as it is.
     """
-    moved = {old.removeprefix("docs/"): new.removeprefix("docs/") for old, new in MOVES}
     here = posixpath.dirname(page_rel)
+    return _outside_fences(
+        text,
+        lambda line: _LINK.sub(
+            lambda m: f"]({_retarget(m.group(1), here, here)})", line
+        ),
+    )
 
-    def fix(match: re.Match[str]) -> str:
-        target = match.group(1)
-        path, sep, rest = target.partition("#")
-        if not sep:
-            path, sep, rest = target.partition("?")
-        if not path.endswith(".md") or "://" in path:
-            return match.group(0)
-        resolved = posixpath.normpath(posixpath.join(here, path))
-        if resolved not in moved:
-            return match.group(0)
-        new_target = posixpath.relpath(moved[resolved], here or ".")
-        return f"]({new_target}{sep}{rest})"
 
-    out: list[str] = []
-    fenced = False
-    for line in text.splitlines(keepends=True):
-        if _FENCE.match(line):
-            fenced = not fenced
-            out.append(line)
-            continue
-        out.append(line if fenced else _LINK.sub(fix, line))
-    return "".join(out)
+def rebase_links(body: str, old_rel: str, new_rel: str) -> str:
+    """Re-express a carried block's relative links from the old page's directory to the new one's.
+
+    Both paths are repository-relative (``docs/...``). A link to a moved page
+    follows the move as well.
+    """
+    from_dir = posixpath.dirname(old_rel.removeprefix("docs/"))
+    to_dir = posixpath.dirname(new_rel.removeprefix("docs/"))
+    return _outside_fences(
+        body,
+        lambda line: _LINK.sub(
+            lambda m: f"]({_retarget(m.group(1), from_dir, to_dir)})", line
+        ),
+    )
 
 
 def _rewrite_project_links(root: Path, notes: list[str]) -> None:
