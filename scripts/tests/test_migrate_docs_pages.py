@@ -144,6 +144,7 @@ def test_readme_blocks_map_by_position_and_skip_placeholders(tmp_path: Path) -> 
     assert '`pip install "demo[all]"`' in readme.split("DOMAIN-README-EXTRAS-START")[1]
     assert "Writes are append-only." in readme.split("DOMAIN-README-DESIGN-START")[1]
     assert any("README.md's positional" in n for n in notes)
+    assert any("still held the scaffold's placeholder" in n for n in notes)
     assert migrate(root) == []
 
 
@@ -165,8 +166,11 @@ def test_readme_with_fewer_blocks_keeps_positions(tmp_path: Path) -> None:
 
 def test_readme_block_without_a_home_is_reported() -> None:
     six = OLD_README + "\n<!-- DOMAIN-START -->\nsixth\n<!-- DOMAIN-END -->\n"
-    _, missing = transplant_readme(six, NEW_README)
+    _, missing, skipped = transplant_readme(six, NEW_README)
     assert missing == ["6"]
+    assert skipped == ["3"], (
+        "the [Task 1] placeholder block is reported, not silently dropped"
+    )
     assert len(positional_blocks(six)) == 6
 
 
@@ -309,3 +313,21 @@ def test_migrate_rewrites_links_on_project_pages(tmp_path: Path) -> None:
     assert "[m](../security-model.md)" in page.read_text(encoding="utf-8")
     assert any("docs/deployment/systemd.md" in n for n in notes)
     assert migrate(root) == []
+
+
+def test_links_in_history_pages_and_fenced_code_are_left_alone(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    (root / "docs" / "releases").mkdir()
+    history = root / "docs" / "releases" / "1.0.md"
+    history.write_text("# 1.0\n\n[m](../guides/security-model.md)\n", encoding="utf-8")
+    fenced = "# S\n\n```markdown\n[m](../guides/security-model.md)\n```\n\n[n](../guides/security-model.md)\n"
+    page = root / "docs" / "deployment" / "systemd.md"
+    page.write_text(fenced, encoding="utf-8")
+    migrate(root)
+    assert (
+        history.read_text(encoding="utf-8")
+        == "# 1.0\n\n[m](../guides/security-model.md)\n"
+    )
+    out = page.read_text(encoding="utf-8")
+    assert "```markdown\n[m](../guides/security-model.md)\n```" in out
+    assert "[n](../security-model.md)" in out

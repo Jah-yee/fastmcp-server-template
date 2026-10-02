@@ -10,7 +10,8 @@ Errors
       `exclude_docs` drops, outside `docs/`, or at nothing.
   E2  a published page is neither in `nav:` nor in a directory that holds a
       nav page, so neither the nav nor llms.txt reaches it.
-  E3  a template section-entry page has lost its link to the security model.
+  E3  a template section-entry page, or README.md, has lost its link to the
+      security model.
 Warnings
   W1  a page the template does not render, and the generator does not write,
       sits outside the designated directories (`use/`, `reference/api/`,
@@ -278,9 +279,21 @@ def collect(root: Path) -> list[Finding]:
         findings.extend(_check_page(site, rel, nav_dirs))
     readme = root / "README.md"
     if readme.exists():
-        findings.extend(
-            _untagged_python("README.md", readme.read_text(encoding="utf-8-sig"))
-        )
+        readme_text = readme.read_text(encoding="utf-8-sig")
+        findings.extend(_untagged_python("README.md", readme_text))
+        if not any(
+            posixpath.normpath(target.split("#", 1)[0]) == f"docs/{SECURITY_MODEL}"
+            for _, target in _link_lines(readme_text)
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    "E3",
+                    "README.md",
+                    None,
+                    "lost its link to the security model",
+                )
+            )
     for rel in ENTRY_PAGES:
         if (site.docs / rel).exists() and not _links_to(site, rel, SECURITY_MODEL):
             findings.append(

@@ -26,7 +26,9 @@ Template script parks, implementation agent sorts:
   reports E2 on it until then.  The update is not finished while a parked
   page exists.
 - Links on the project's own pages that point at a moved page are rewritten
-  to the new path, anchor kept, so the structure check does not report them.
+  to the new path, anchor kept, so the structure check does not report them;
+  release notes, decision records and fenced code keep their old links, which
+  the redirects serve.
 - The ``GENERATED-NAV-TOOLS`` region of ``mkdocs.yml``: a conflict inside it
   is resolved to the template's side, since ``gen_reference.py`` rewrites it.
 
@@ -168,22 +170,26 @@ def transplant(old: str, new: str) -> tuple[str, list[str]]:
     return new, missing
 
 
-def transplant_readme(old: str, new: str) -> tuple[str, list[str]]:
+def transplant_readme(old: str, new: str) -> tuple[str, list[str], list[str]]:
     """Carry the old README's positional blocks into the new named ones.
 
-    Returns the updated README and the positions (1-based) that had content
-    but no named block to land in.
+    Returns the updated README, the positions (1-based) that had content but
+    no named block to land in, and the positions skipped as the scaffold's
+    placeholder text.
     """
     targets = blocks(new)
-    missing = []
+    missing: list[str] = []
+    skipped: list[str] = []
     for index, body in enumerate(positional_blocks(old)):
         if not _written(body):
+            if _COMMENT.sub("", body).strip():
+                skipped.append(str(index + 1))
             continue
         if index >= len(README_BLOCKS) or README_BLOCKS[index] not in targets:
             missing.append(str(index + 1))
             continue
         new = _replace_block(new, README_BLOCKS[index], body)
-    return new, missing
+    return new, missing, skipped
 
 
 def take_template_side(text: str) -> str:
@@ -237,17 +243,27 @@ def _carry_readme(root: Path, notes: list[str]) -> None:
     current = path.read_text(encoding="utf-8")
     resolved = take_template_side(current)
     if resolved != current:
-        notes.append("resolved README.md's update conflict to the template's new frame")
+        notes.append(
+            "resolved README.md's update conflict to the template's new frame; "
+            "text written outside the old DOMAIN blocks is dropped, so compare "
+            "with `git show HEAD:README.md`"
+        )
     if positional_blocks(resolved):
         if resolved != current:
             path.write_text(resolved, encoding="utf-8")
         return  # the README still has the old frame; nothing to map into
-    updated, missing = transplant_readme(old, resolved)
-    if updated != current:
-        path.write_text(updated, encoding="utf-8")
+    updated, missing, skipped = transplant_readme(old, resolved)
+    if updated == current:
+        return  # already carried on an earlier run
+    path.write_text(updated, encoding="utf-8")
     if updated != resolved:
         notes.append(
             "carried README.md's positional DOMAIN blocks into the named blocks"
+        )
+    if skipped:
+        notes.append(
+            f"README.md block(s) {', '.join(skipped)} (counted from the top of the old "
+            "file) still held the scaffold's placeholder and were not carried"
         )
     if missing:
         notes.append(
@@ -269,8 +285,16 @@ def _park(root: Path, rel: str, notes: list[str]) -> None:
     )
 
 
+# Pages whose links are a historical record: the redirect serves them.
+_HISTORY = ("releases/", "decisions/", "design/", "superpowers/")
+_FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})", re.MULTILINE)
+
+
 def rewrite_links(text: str, page_rel: str) -> str:
-    """Point links on *page_rel* (docs-relative) at the new path of a moved page."""
+    """Point links on *page_rel* (docs-relative) at the new path of a moved page.
+
+    Fenced code is left as it is.
+    """
     moved = {old.removeprefix("docs/"): new.removeprefix("docs/") for old, new in MOVES}
     here = posixpath.dirname(page_rel)
 
@@ -282,7 +306,15 @@ def rewrite_links(text: str, page_rel: str) -> str:
         new_target = posixpath.relpath(moved[resolved], here or ".")
         return f"{match.group(1)}{new_target}{match.group(3)}"
 
-    return _LINK.sub(fix, text)
+    out: list[str] = []
+    fenced = False
+    for line in text.splitlines(keepends=True):
+        if _FENCE.match(line):
+            fenced = not fenced
+            out.append(line)
+            continue
+        out.append(line if fenced else _LINK.sub(fix, line))
+    return "".join(out)
 
 
 def _rewrite_project_links(root: Path, notes: list[str]) -> None:
@@ -292,6 +324,8 @@ def _rewrite_project_links(root: Path, notes: list[str]) -> None:
     changed = []
     for page in sorted(docs.rglob("*.md")):
         rel = page.relative_to(docs).as_posix()
+        if rel.startswith(_HISTORY):
+            continue
         text = page.read_text(encoding="utf-8")
         updated = rewrite_links(text, rel)
         if updated != text:

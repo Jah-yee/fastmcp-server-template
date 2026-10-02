@@ -194,3 +194,13 @@ def test_w4_python_block_without_a_tag(tmp_path: Path) -> None:
         ("docs/use/x.md", 7),
         ("docs/use/y.md", 7),
     ]
+
+
+def test_e3_readme_must_link_the_security_model(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    (root / "README.md").write_text("# R\n\nNo link.\n", encoding="utf-8")
+    assert ("E3", "README.md") in _codes(root)
+    (root / "README.md").write_text(
+        "# R\n\nSee the [model](docs/security-model.md#scope).\n", encoding="utf-8"
+    )
+    assert ("E3", "README.md") not in _codes(root)
