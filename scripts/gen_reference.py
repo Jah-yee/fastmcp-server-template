@@ -426,7 +426,7 @@ def _cell(text: str) -> str:
 
 
 # Stretches _prose never touches: code spans and Markdown links.
-_LITERAL = re.compile(r"`[^`]*`|\[[^\]]*\]\([^)]*\)")
+_LITERAL = re.compile(r"`[^`]+`|\[[^\]]*\]\([^)]*\)")
 _IDENTIFIER = re.compile(r"\b[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+\b")
 
 
